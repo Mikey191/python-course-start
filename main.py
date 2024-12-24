@@ -1,4 +1,50 @@
 import random
+import time
+
+# Список студентов РПО-1
+# students = [
+#     "Асанов Абдуррахман Исхакович",
+#     "Афашагов Муса Мухамедович",
+#     "Бациев Самир Алимбекович",
+#     "Берхамов Камбулат Рустамович",
+#     "Дышекова Амина Аюбовна",
+#     "Заракушев Билял Анатольевич",
+#     "Захаров Роман Викторович",
+#     "Карданова Алина Хачимовна",
+#     "Керефов Алан Асланович",
+#     "Кяов Ислам Артурович",
+#     "Мидов Ислам Арсенович",
+#     "Мирзоев Алихан Нартович",
+#     "Моссад Адам Абдель Басир",
+#     "Муртазалиев Аюб Раджапович",
+#     "Пучков Владислав Романович",
+#     "Сокуров Самир Залимович",
+#     "Таштемиров Темирлан Алибекович",
+#     "Хапцаков Рахим Рамазанович",
+#     "Хашукоев Дауд Аскарбиевич",
+#     "Хоконова Лилиана Замировна",
+# ]
+
+# Список студентов РПО-2
+students = [
+    "Аюбов Каплан Муратович",
+    "Балкаров Алихан Альбертович",
+    "Балкаров Анзор Заурбекович",
+    "Барагунов Саид Вячеславович",
+    "Бетрозов Идар Рустамович",
+    "Бутусова Варвара Владимировна",
+    "Далхадов Элисултан Лимиевич",
+    "Жигунова Саида Рамазановна",
+    "Кашежев Кантемир Иналович",
+    "Кипшиев Тигран Артурович",
+    "Пежев Азрет Рустамович",
+    "Созаев Мухаммат Азнорович",
+    "Сохов Радмир Залимович",
+    "Тотоев Дамир Артурович",
+    "Хаджиев Инарбек Андзорович",
+    "Шавацуков Салим Алимович",
+    "Шарданов Мурат Мухамедович",
+]
 
 # Список вопросов
 questions = [
@@ -67,28 +113,34 @@ senior_tasks = [
     "Напишите программу, которая считает количество гласных и согласных букв в введенной строке. Гласные буквы: аеёиоуыэюя.",
 ]
 
+
 # Выбор случайных вопросов и задач
 def random_questions(questions: list):
+    c_questions = questions.copy()
     random_questions = []
     for _ in range(3):
-        random_question = random.choice(questions)
+        random_question = random.choice(c_questions)
         random_questions.append(random_question)
-        questions.remove(random_question)
+        c_questions.remove(random_question)
     return random_questions
 
 
-lst_random_questions = random_questions(questions)
-random_junior_task = random.choice(junior_tasks)
-random_middle_task = random.choice(middle_tasks)
-random_senior_task = random.choice(senior_tasks)
-
-# Вывод выбранных вопросов и задач
-print("Вопросы на экзамен:")
-for question in lst_random_questions:
-    print(question)
-print("\nЗадача уровня Junior:")
-print(random_junior_task)
-print("\nЗадача уровня Middle:")
-print(random_middle_task)
-print("\nЗадача уровня Senior:")
-print(random_senior_task)
+# Вывод студентов, вопросы и задачи
+while students:
+    lst_random_questions = random_questions(questions)
+    random_junior_task = random.choice(junior_tasks)
+    random_middle_task = random.choice(middle_tasks)
+    random_senior_task = random.choice(senior_tasks)
+    time.sleep(1)
+    student = random.choice(students)
+    print(f"\nСтудент: {student}")
+    students.remove(student)
+    print("Вопросы на экзамен:")
+    for index in range(len(lst_random_questions)):
+        print(f"\t{index+1}. {lst_random_questions[index]}")
+    print("Задача уровня Junior:")
+    print(f"\t{random_junior_task}")
+    print("Задача уровня Middle:")
+    print(f"\t{random_middle_task}")
+    print("Задача уровня Senior:")
+    print(f"\t{random_senior_task}")
