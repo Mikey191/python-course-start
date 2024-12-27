@@ -100,22 +100,22 @@
 # print(dq)  # deque([4, 5, 6], maxlen=3)
 
 
-from collections import namedtuple
+# from collections import namedtuple
 
-Point = namedtuple('Point', ['x', 'y'])
+# Point = namedtuple('Point', ['x', 'y'])
 
-p = Point(10, 20)
+# p = Point(10, 20)
 
-print(p)
+# print(p)
 
-data = [30, 40]
-p = Point._make(data)
-print(p._asdict())  # {'x': 30, 'y': 40}
+# data = [30, 40]
+# p = Point._make(data)
+# print(p._asdict())  # {'x': 30, 'y': 40}
 
-data = range(2)
-p = Point._make(data)
-print(p._asdict())  # {'x': 0, 'y': 1}
+# data = range(2)
+# p = Point._make(data)
+# print(p._asdict())  # {'x': 0, 'y': 1}
 
-data = ("30", "40")
-p = Point._make(data)
-print(p._asdict())  # {'x': '30', 'y': '40'}
+# data = ("30", "40")
+# p = Point._make(data)
+# print(p._asdict())  # {'x': '30', 'y': '40'}
