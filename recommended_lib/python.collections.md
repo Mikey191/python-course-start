@@ -945,3 +945,229 @@ c: 1
 Добавлено событие: Event 7
 Текущий журнал: ['Event 3', 'Event 4', 'Event 5', 'Event 6', 'Event 7']
 ```
+
+## 5. `from collections import namedtuple`
+
+**`namedtuple` — это специальный класс из модуля `collections`, который позволяет создавать неизменяемые объекты, похожие на кортежи, но с доступом к элементам через имена полей, а не только через индексы. Он помогает делать код более читаемым и структурированным, особенно когда данные связаны логически**.
+
+### Особенности и отличия от обычного кортежа:
+- **Имена полей**: **У элементов есть имена, и к ним можно обращаться через атрибуты, а не только через индексы.**
+- **Иммутабельность**: **`namedtuple` неизменяем, как и обычный кортеж**.
+- **Читаемость**: **Код с `namedtuple` легче понять, так как имена атрибутов объясняют их смысл**.
+- **Универсальность**: **Можно использовать методы, специфичные для `namedtuple`, такие как `_asdict`, `_replace` и другие**.
+
+### Создание и использование `namedtuple`
+```py
+from collections import namedtuple
+
+# Создание namedtuple
+Point = namedtuple('Point', ['x', 'y'])
+
+# Создание экземпляра
+p = Point(10, 20)
+print(p)  # Point(x=10, y=20)
+```
+
+### Доступ к элементам
+- По имени поля
+```python
+print(p.x)  # 10
+print(p.y)  # 20
+```
+
+- По индексу
+```python
+print(p[0])  # 10
+print(p[1])  # 20
+```
+
+### Методы и свойства namedtuple
+#### 1. `_make(iterable)`
+- **Создает объект `namedtuple` из итерации**.
+
+- **Пример**:
+
+```python
+data = [30, 40]
+p = Point._make(data)
+print(p)  # Point(x=30, y=40)
+
+data = range(2)
+p = Point._make(data)
+print(p)  # Point(x=0, y=1)
+
+data = ("30", "40")
+p = Point._make(data)
+print(p)  # Point(x='30', y='40')
+```
+
+#### 2. `_asdict()`
+- **Возвращает объект в виде словаря**.
+
+- **Пример**:
+
+```python
+data = [30, 40]
+p = Point._make(data)
+print(p._asdict())  # {'x': 30, 'y': 40}
+
+data = range(2)
+p = Point._make(data)
+print(p._asdict())  # {'x': 0, 'y': 1}
+
+data = ("30", "40")
+p = Point._make(data)
+print(p._asdict())  # {'x': '30', 'y': '40'}
+```
+
+#### 3. `_replace(**kwargs)`
+- **Возвращает новый объект с замененными значениями**.
+
+- **Пример**:
+
+```python
+p_new = p._replace(y=50)
+print(p_new)  # Point(x=10, y=50)
+```
+
+#### 4. `_fields`
+- **Возвращает имена полей**.
+
+- **Пример**:
+
+```python
+print(Point._fields)  # ('x', 'y')
+```
+
+#### 5. `_field_defaults`
+- **Возвращает значения по умолчанию для полей (начиная с Python 3.7)**.
+
+- **Пример**:
+
+```python
+Person = namedtuple('Person', ['name', 'age'], defaults=['Unknown', 30])
+p3 = Person()
+print(p3)  # Person(name='Unknown', age=30)
+```
+
+### Когда использовать namedtuple:
+Для структурированных данных, где важна неизменяемость.
+Когда нужно объединить свойства кортежа (эффективность) и понятность словаря (читаемость).
+Для замены структур данных, похожих на объекты, без необходимости использования полноценного класса.
+
+### Итоговое использование namedtuple
+Рассмотрим пример, приближенный к реальному проекту: **управление координатами и цветами точек на графике.**
+
+```py
+from collections import namedtuple
+
+# Описание структуры точки
+Point = namedtuple('Point', ['x', 'y', 'color'])
+
+# Список точек
+points = [
+    Point(10, 20, 'red'),
+    Point(30, 40, 'blue'),
+    Point(50, 60, 'green')
+]
+
+# Пример обработки
+for point in points:
+    print(f"Точка ({point.x}, {point.y}) имеет цвет {point.color}")
+
+# Добавление новой точки из списка
+new_point_data = [70, 80, 'yellow']
+new_point = Point._make(new_point_data)
+print(new_point)  # Point(x=70, y=80, color='yellow')
+
+# Замена цвета у первой точки
+updated_point = points[0]._replace(color='black')
+print(updated_point)  # Point(x=10, y=20, color='black')
+
+# Преобразование точек в словари
+points_dicts = [point._asdict() for point in points]
+print(points_dicts)
+# [{'x': 10, 'y': 20, 'color': 'red'}, {'x': 30, 'y': 40, 'color': 'blue'}, {'x': 50, 'y': 60, 'color': 'green'}]
+```
+
+### Задачи для закрепления темы namedtuple
+1. **Задача 1**: **Характеристики автомобиля**
+- Создайте namedtuple для описания автомобиля с полями: brand, model, year, color.
+- Создайте список из 3 автомобилей.
+- Выведите на экран только brand и model каждого автомобиля.
+- Преобразуйте первый автомобиль в словарь и измените его color на "black".
+
+2. **Задача 2**: **Студенты и оценки**
+- Создайте namedtuple для представления данных о студенте: name, age, grade.
+- Создайте список студентов (минимум 5).
+- Найдите студентов с оценкой выше 80.
+- Преобразуйте всех студентов в словари и выведите их в читаемом формате.
+
+3. **Задача 3**: **Описание книг**
+- Создайте namedtuple для описания книги с полями: title, author, year, price.
+- Создайте список из 4 книг.
+- Добавьте новую книгу с использованием метода _make.
+- Увеличьте цену каждой книги на 10% с использованием метода _replace.
+- Выведите список книг в виде словарей.
+
+4. **Задача 4**: **Фильмы и рейтинги**
+- Создайте namedtuple для фильмов с полями: title, director, rating.
+- Создайте список из 5 фильмов.
+- Найдите фильм с наивысшим рейтингом.
+- Замените режиссера первого фильма на "Unknown" и выведите измененную информацию.
+
+5. **Задача 5**: **Координаты точек**
+- Создайте namedtuple для представления координат с полями: x, y, z.
+- Создайте список из 4 точек.
+- Вычислите расстояние от каждой точки до начала координат (0, 0, 0).
+- Найдите точку, наиболее удаленную от начала координат.
+
+6. **Обобщающая задача**. **Управление продуктами в магазине**.
+- Создайте программу для управления продуктами в магазине.
+    - Создайте namedtuple Product с полями: name, category, price, quantity.
+    - Создайте список из 6 продуктов (разные категории).
+- Реализуйте следующие функции:
+    - Вывести все продукты, сгруппированные по категориям.
+    - Увеличить количество продуктов определенной категории на 10.
+    - Увеличить цену всех продуктов на 5%.
+    - Преобразовать все продукты в словари и вывести их.
+- Пример:
+
+```python
+from collections import namedtuple
+
+# Создаем namedtuple
+Product = namedtuple('Product', ['name', 'category', 'price', 'quantity'])
+
+# Список продуктов
+products = [
+    Product('Apple', 'Fruits', 1.2, 50),
+    Product('Orange', 'Fruits', 1.5, 30),
+    Product('Carrot', 'Vegetables', 0.8, 100),
+    Product('Potato', 'Vegetables', 0.5, 200),
+    Product('Milk', 'Dairy', 2.0, 20),
+    Product('Cheese', 'Dairy', 5.0, 10)
+]
+
+# Группировка по категориям
+categories = {}
+for product in products:
+    categories.setdefault(product.category, []).append(product)
+
+print("Продукты по категориям:")
+for category, items in categories.items():
+    print(f"{category}: {[item.name for item in items]}")
+
+# Увеличение количества продуктов
+updated_products = [p._replace(quantity=p.quantity + 10) if p.category == 'Fruits' else p for p in products]
+
+# Увеличение цены всех продуктов
+updated_products = [p._replace(price=round(p.price * 1.05, 2)) for p in updated_products]
+
+# Преобразование в словари
+products_dicts = [p._asdict() for p in updated_products]
+print("\nОбновленный список продуктов:")
+for p in products_dicts:
+    print(p)
+```
+

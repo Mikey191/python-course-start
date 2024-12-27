@@ -84,17 +84,38 @@
 # default_dict2 = {"2": 2, "1": 1}
 # print(default_dict1 == default_dict2)
 
-from collections import deque
+# from collections import deque
 
-dq = deque()
-print(dq)
-dq = deque([1,2,3,4,5])
-print(dq)  # deque([1, 2, 3, 4, 5])
-dq = deque((1,2,3,4,5))
-print(dq)  # deque([1, 2, 3, 4, 5])
-dq = deque({1,2,3,4,5})
-print(dq)  # deque([1, 2, 3, 4, 5])
-dq = deque('apple')
-print(dq)  # deque(['a', 'p', 'p', 'l', 'e'])
-dq = deque([1,2,3,4,5,6], maxlen=3)
-print(dq)  # deque([4, 5, 6], maxlen=3)
+# dq = deque()
+# print(dq)
+# dq = deque([1,2,3,4,5])
+# print(dq)  # deque([1, 2, 3, 4, 5])
+# dq = deque((1,2,3,4,5))
+# print(dq)  # deque([1, 2, 3, 4, 5])
+# dq = deque({1,2,3,4,5})
+# print(dq)  # deque([1, 2, 3, 4, 5])
+# dq = deque('apple')
+# print(dq)  # deque(['a', 'p', 'p', 'l', 'e'])
+# dq = deque([1,2,3,4,5,6], maxlen=3)
+# print(dq)  # deque([4, 5, 6], maxlen=3)
+
+
+from collections import namedtuple
+
+Point = namedtuple('Point', ['x', 'y'])
+
+p = Point(10, 20)
+
+print(p)
+
+data = [30, 40]
+p = Point._make(data)
+print(p._asdict())  # {'x': 30, 'y': 40}
+
+data = range(2)
+p = Point._make(data)
+print(p._asdict())  # {'x': 0, 'y': 1}
+
+data = ("30", "40")
+p = Point._make(data)
+print(p._asdict())  # {'x': '30', 'y': '40'}
