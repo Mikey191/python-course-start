@@ -1,2 +1,2 @@
-d = {}
+d = tuple()
 print(type(d))
