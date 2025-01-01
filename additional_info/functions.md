@@ -338,7 +338,7 @@ rectangle_area = lambda length, width: length * width
 print(rectangle_area(4, 5))  # Вывод: 20
 ```
 
-## Функции высшего порядка. `map()`, `filter()`, `sorted()`
+## Функции высшего порядка. `map()`, `filter()`, `sorted()`, `reduce()`
 
 **Функция** считается `функцией высшего порядка`, если она:
 
@@ -459,6 +459,49 @@ print(sorted_pairs)  # Вывод: [(1, 'a'), (2, 'b'), (3, 'c')]
 people = [{"name": "Alice", "age": 25}, {"name": "Bob", "age": 20}]
 sorted_people = sorted(people, key=lambda person: person['age'])
 print(sorted_people) # Вывод: [{'name': 'Bob', 'age': 20}, {'name': 'Alice', 'age': 25}]
+```
+
+### `reduce()`
+
+**Функция `reduce()` из модуля `functools` — это инструмент для выполнения кумулятивных операций на последовательностях (например, списках или кортежах). Она поэтапно сводит последовательность элементов к одному значению, применяя указанную функцию.**
+
+#### **Пример нахождения суммы всех чисел с помощью функции `reduce()`**:
+
+```python
+from functools import reduce
+
+numbers = [10, 20, 30, 40]
+
+# Используем reduce для суммирования
+total_sum = reduce(lambda x, y: x + y, numbers)
+
+print(f"Сумма чисел: {total_sum}")
+```
+
+#### **Пример нахождения произведения чисел с помощью функции `reduce()`**:
+
+```python
+from functools import reduce
+
+numbers = [2, 3, 4, 5]
+
+# Используем reduce для нахождения произведения
+product = reduce(lambda x, y: x * y, numbers)
+
+print(f"Произведение чисел: {product}")
+```
+
+#### **Пример нахождения суммы чисел с начальным значением с помощью функции `reduce()`**:
+
+```python
+from functools import reduce
+
+numbers = [10, 20, 30, 40]
+
+# Используем начальное значение
+total_sum = reduce(lambda x, y: x + y, numbers, 100)
+
+print(f"Сумма чисел с начальным значением "100": {total_sum}")
 ```
 
 ### Примеры близкие к реальным задачам.
@@ -591,6 +634,220 @@ high_income_months = list(filter(lambda s: s[1] > 100000, numbered_sales))
 sorted_high_income = sorted(high_income_months, key=lambda s: s[1])
 
 print(sorted_high_income)
+```
+
+#### 5. **Расчет общего дохода с учетом начального баланса**
+
+**У компании есть начальный баланс, который вводится вручную с терминала. Также имеется список транзакций, где положительные числа представляют доходы, а отрицательные числа представляют расходы**.
+
+**Нужно**:
+
+- **Рассчитать итоговый баланс компании, применив все транзакции к начальному балансу**.
+- **Вывести итоговый баланс с пояснением**.
+
+```python
+from functools import reduce
+
+# Ввод начального баланса вручную
+initial_balance = float(input("Введите начальный баланс компании: "))
+
+# Список транзакций (доходы и расходы)
+transactions = [500, -200, 300, -50, 1000]
+
+# Рассчитываем итоговый баланс
+final_balance = reduce(lambda balance, transaction: balance + transaction, transactions, initial_balance)
+
+# Условный вывод результата
+if final_balance > initial_balance:
+    print(f"Итоговый баланс увеличился. Баланс: {final_balance:.2f}")
+elif final_balance < initial_balance:
+    print(f"Итоговый баланс уменьшился. Баланс: {final_balance:.2f}")
+else:
+    print(f"Итоговый баланс остался без изменений. Баланс: {final_balance:.2f}")
+```
+
+## Функции `any()`, `all()`, `zip()`, `enumerate()`.
+
+### `any()`
+**Функция `any()` возвращает `True`, если хотя бы одно из значений в переданном итерируемом объекте является истинным. В противном случае она возвращает `False`**.
+
+#### **Проверка истинности элементов**:
+
+```python
+responses = [False, False, True]
+print(any(responses))  # Результат: True
+```
+
+#### **Есть ли хотя бы один элемент в списке, который больше 10**:
+
+```python
+numbers = [1, 2, 3, 11, 5]
+result = any(num > 10 for num in numbers)
+print(result)  # Вывод: True
+```
+
+#### **Использование `any()` с `lambda` и `map()`**
+
+**Есть ли хотя бы одно четное число**:
+
+```python
+numbers = [1, 3, 5, 7, 8]
+result = any(map(lambda x: x % 2 == 0, numbers))
+print(result)  # Вывод: True
+```
+
+### `all()`
+
+**Функция `all()` проверяет, являются ли все элементы в итерируемом объекте истинными. Если все элементы истинные, функция возвращает `True`, в противном случае — `False`**.
+
+#### **Проверка всех элементов:**
+
+```python
+grades = [True, True, True]
+print(all(grades))  # Результат: True
+```
+
+#### **Проверить, все ли числа в списке положительные:**
+
+```python
+numbers = [1, 2, 3, 4, 5]
+result = all(num > 0 for num in numbers)
+print(result)  # Вывод: True
+```
+
+#### **Использование `all()` с `lambda` и `map()`**
+
+**Проверим, все ли числа в списке четные:**
+
+```python
+numbers = [2, 4, 6, 8]
+result = all(map(lambda x: x % 2 == 0, numbers))
+print(result)  # Вывод: True
+```
+
+### `zip()`
+**Функция `zip()` объединяет несколько итерируемых объектов в один, создавая пары элементов. Это особенно полезно, когда нужно работать с несколькими списками одновременно.**
+
+#### **Объединение списков в пары:**
+
+```python
+names = ["Alice", "Bob", "Charlie"]
+scores = [85, 90, 78]
+result = list(zip(names, scores))
+print(result)  # Результат: [('Alice', 85), ('Bob', 90), ('Charlie', 78)]
+```
+
+#### **Создание словаря из двух списков:**
+
+```python
+keys = ["name", "age", "city"]
+values = ["Alice", 30, "New York"]
+dictionary = dict(zip(keys, values))
+print(dictionary)  # Результат: {'name': 'Alice', 'age': 30, 'city': 'New York'}
+```
+
+#### **Итерирование по нескольким объектам:**
+
+```python
+dates = ["2023-01-01", "2023-01-02", "2023-01-03"]
+tasks = ["Meeting", "Workout", "Study"]
+for date, task in zip(dates, tasks):
+    print(f"On {date}, you need to: {task}")
+# Результат:
+# On 2023-01-01, you need to: Meeting
+# On 2023-01-02, you need to: Workout
+# On 2023-01-03, you need to: Study
+```
+
+### `enumerate()`
+
+**Функция `enumerate()` добавляет счетчик к итерируемому объекту и возвращает его в виде перечисления. Это полезно, когда нужно получить индекс элемента вместе с самим элементом.**
+
+#### **Пронумерованный вывод:**
+
+```python
+tasks = ["Meeting", "Workout", "Study"]
+for index, task in enumerate(tasks, start=1):
+    print(f"{index}. {task}")
+# Результат:
+# 1. Meeting
+# 2. Workout
+# 3. Study
+```
+
+#### **Изменение значений по индексу:**
+
+```python
+tasks = ["Meeting", "Workout", "Study"]
+for index, task in enumerate(tasks):
+    if task == "Workout":
+        tasks[index] = "Yoga"
+print(tasks)  # Результат: ['Meeting', 'Yoga', 'Study']
+```
+
+### Примеры близкие к реальным задачам.
+
+#### 1. **Проверка валидности данных с использованием `any()` и `all()`**.
+
+**Проверяется**:
+
+- Заполнены ли все данные для каждого пользователя.
+- Есть ли хотя бы один пользователь с ролью администратора.
+
+```python
+users = [
+    {"name": "Alice", "email": "alice@example.com", "role": "user"},
+    {"name": "Bob", "email": "", "role": "admin"},
+    {"name": "Charlie", "email": "charlie@example.com", "role": "user"},
+]
+
+# Проверка: У каждого пользователя заполнены все данные
+all_data_filled = all(all(value for value in user.values()) for user in users)
+
+# Проверка: Есть ли хотя бы один пользователь с ролью администратора
+any_admin_present = any(user["role"] == "admin" for user in users)
+
+print(f"У всех пользователей заполнены все данные: {all_data_filled}")
+print(f"Есть ли хотя бы один администратор: {any_admin_present}")
+```
+
+#### 2. **Нумерация задач для выдачи отчета с использованием `enumerate()`**
+
+**После проверки выводятся два списка**:
+
+- Список выполненных задач.
+- Список невыполненных задач.
+
+```python
+tasks = [
+    {"description": "Подготовить документы", "status": "Сделал"},
+    {"description": "Провести совещание", "status": "Не сделал"},
+    {"description": "Отправить отчет", "status": "Сделал"},
+]
+
+# Сортируем задачи по статусу
+done_tasks = [task["description"] for task in tasks if task["status"] == "Сделал"]
+not_done_tasks = [task["description"] for task in tasks if task["status"] == "Не сделал"]
+
+# Выводим списки задач с нумерацией
+print("Сделанные задачи:")
+for index, task in enumerate(done_tasks, start=1):
+    print(f"{index}. {task}")
+
+print("\nНевыполненные задачи:")
+for index, task in enumerate(not_done_tasks, start=1):
+    print(f"{index}. {task}")
+```
+
+**Результат**:
+
+```
+Сделанные задачи:
+1. Подготовить документы
+2. Отправить отчет
+
+Невыполненные задачи:
+1. Провести совещание
 ```
 
 ## Задачи:
@@ -776,3 +1033,57 @@ print(sorted_high_income)
       ```python
       [{"id": 4, "price": 1500}, {"id": 2, "price": 1200}]
       ```
+
+23. **Проверка, есть ли хотя бы одно четное число в списке**
+    Дано:
+
+    ```python
+    numbers = [3, 7, 8, 11, 6, 9]
+    ```
+    Используйте функцию `any()` для проверки, есть ли в списке хотя бы одно четное число.
+
+24. **Проверка, что все элементы списка строки**
+    Дано:
+
+    ```python
+    items = ["apple", "banana", "cherry", "45"]
+    ```
+    Используйте функцию all() для проверки, что все элементы списка — строки.
+
+25. **Создание пар из двух списков с помощью `zip()`**
+    Дано:
+
+    ```python
+    names = ["John", "Jane", "Alice", "Bob"]
+    ages = [23, 29, 22, 35]
+    ```
+    Используйте функцию zip() для объединения их в список пар (кортежей).
+
+26. **Нумерация задач для отчета с условием**
+    Дано:
+
+    ```python
+    tasks = [
+        {"task": "Prepare report", "status": "Done"},
+        {"task": "Review code", "status": "Not done"},
+        {"task": "Send email", "status": "Done"},
+        {"task": "Update documentation", "status": "Not done"}
+    ]
+    ```
+    Используйте enumerate() для пронумерованного списка задач и разделите задачи на выполненные и невыполненные, выводя их отдельно.
+
+27. **Итерация по списку с фильтрацией и проверкой данных**
+    Дано:
+
+    ```python
+    users = [
+        {"name": "Alice", "age": 25},
+        {"name": "Bob", "age": 18},
+        {"name": "Charlie", "age": 22},
+        {"name": "David", "age": 17}
+    ]
+    ```
+    Используйте zip(), чтобы объединить список с возрастами и список с именами. Затем с помощью any() и all() проверьте:
+
+    - Есть ли пользователи младше 18 лет.
+    - Все ли пользователи старше 25 лет.
