@@ -72,6 +72,22 @@ class LinkedList:
             "data is not found"
         )  # Если узел не найден сообщаем, что элемент не найден
 
+    def delete_last_node(self):
+        """
+        Метод для удаления последнего элемента
+        """
+        if not self.head:
+            return
+        if not self.head.next:
+            self.head = None
+            return
+        current = self.head
+        while current.next.next:
+            current = current.next
+        last_elem = current.next
+        current.next = None
+        return last_elem
+
 
 node = Node(10)  # Пример: создание узла
 print(node.data, node.next)  # Вывод: 10 None
@@ -89,3 +105,5 @@ linked_list.print_list()  # 30 ->  20 ->  10 ->  40 ->  40 ->  None
 linked_list.delete_node(10)
 linked_list.delete_node(100)
 linked_list.print_list()  # 30 ->  20 ->  40 ->  40 ->  None
+linked_list.delete_last_node()
+linked_list.print_list()  # 30 ->  20 ->  40 ->  None
