@@ -307,3 +307,166 @@ def archive(request, year):
 ```
 
 Теперь параметр `year` будет автоматически преобразован в целое число благодаря методу `to_python`. Убедитесь в этом, поставив точку останова в режиме отладки.
+
+## 1.7 GET- и POST-запросы. Обработчики исключений запросов
+
+### Структура GET-запросов
+
+`GET-запросы` передают параметры через `URL-адрес`. Пример `URL` с параметрами:
+
+```plaintext
+http://127.0.0.1:8000/?name=Smith&category=books
+```
+
+**В этом URL**:
+
+- Знак вопроса `?` обозначает начало параметров.
+- Пары `ключ-значение`, такие как `name=Smith` и `category=books`, разделены амперсандом `&`.
+
+`Параметры GET-запросов` используются для **передачи данных на сервер через адресную строку**.
+
+### Извлечение параметров GET-запросов в Django
+
+Для обработки параметров `GET-запросов` используется объект `request.GET`, который представляет собой словарь (`QueryDict`). Рассмотрим пример:
+
+```python
+from django.http import HttpResponse
+
+def example_view(request):
+    print(request.GET)  # Отображаем параметры в консоли
+    return HttpResponse("<h1>Обработка GET-запросов</h1>")
+```
+
+Если выполнить запрос:
+
+```plaintext
+http://127.0.0.1:8000/?name=Smith&category=books
+```
+
+В консоли отобразится:
+
+```plaintext
+<QueryDict: {'name': ['Smith'], 'category': ['books']}>
+```
+
+### POST-запросы: Передача данных из форм
+
+`POST-запросы` используются для **передачи данных из форм**. Данные доступны через объект `request.POST`.
+
+**Пример**:
+
+```python
+def example_post_view(request):
+    if request.POST:
+        print(request.POST)  # Печатаем данные формы в консоли
+    return HttpResponse("<h1>Обработка POST-запросов</h1>")
+```
+
+### Различие между `request.GET` и `request.POST` заключается в источнике данных:
+
+- `GET` — параметры в `URL`.
+- `POST` — **данные** формы, **переданные в теле запроса**.
+
+### Обработка исключений запросов. Ошибка 404: Страница не найдена
+
+При обращении к несуществующему пути сервер возвращает `ошибку 404`.
+
+В режиме разработки (при `DEBUG = True`) в файле `settings.py` отображается отладочная информация.
+
+Чтобы настроить поведение в боевом режиме (`DEBUG = False`), следует указать разрешенные хосты:
+
+```python
+# settings.py
+ALLOWED_HOSTS = ['127.0.0.1']
+```
+
+Обработчик `404` можно переопределить в `urls.py`:
+
+```python
+# urls.py
+handler404 = 'myapp.views.page_not_found'
+```
+
+Реализация функции `page_not_found`:
+
+```python
+from django.http import HttpResponseNotFound
+
+def page_not_found(request, exception):
+    return HttpResponseNotFound('<h1>Страница не найдена</h1>')
+```
+
+Теперь сервер будет возвращать пользовательскую страницу `404`.
+
+### Генерация исключений вручную
+
+`Исключения 404` можно вызывать **вручную**.
+
+**Пример**:
+
+```python
+from django.http import Http404
+
+def archive(request, year):
+    if year > 2025:
+        raise Http404("Год превышает допустимый диапазон")
+    return HttpResponse(f"<h1>Архив {year}</h1>")
+```
+
+При вызове исключения сервер автоматически перенаправит пользователя на обработчик `page_not_found`.
+
+### Обработка других ошибок
+
+Аналогично можно переопределить обработчики других ошибок:
+
+- `handler500` — ошибка сервера.
+- `handler403` — доступ запрещен.
+- `handler400` — невозможно обработать запрос.
+
+Пример для 500-й ошибки:
+
+```python
+# urls.py
+handler500 = 'myapp.views.server_error'
+```
+
+```python
+# views.py
+from django.http import HttpResponseServerError
+
+def server_error(request):
+    return HttpResponseServerError('<h1>Ошибка сервера</h1>')
+```
+
+### Django QueryDict
+
+`request.GET` и `request.POST` реализованы на основе класса `QueryDict`.
+
+Этот объект позволяет работать с несколькими значениями одного ключа и предоставляет методы:
+
+- `get(key)` — получение значения.
+- `getlist(key)` — получение списка всех значений ключа.
+- `dict()` — преобразование в словарь Python.
+
+**Пример**:
+
+```python
+def example_view(request):
+    name = request.GET.get('name', 'Неизвестно')
+    categories = request.GET.getlist('category')
+    print(f"Имя: {name}, Категории: {categories}")
+    return HttpResponse("Обработка параметров запроса")
+```
+
+### Http404 и обработчики ошибок
+
+Класс `Http404` используется для генерации исключения. Он интегрируется с обработчиком `404` и перенаправляет пользователя.
+
+**Пример использования**:
+
+```python
+def custom_view(request):
+    if some_condition:
+        raise Http404("Элемент не найден")
+    return HttpResponse("<h1>Успешный запрос</h1>")
+```
