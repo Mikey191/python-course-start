@@ -470,3 +470,128 @@ def custom_view(request):
         raise Http404("Элемент не найден")
     return HttpResponse("<h1>Успешный запрос</h1>")
 ```
+
+## 1.8 Перенаправления (redirect). Функция reverse
+
+Django предоставляет несколько способов для реализации перенаправлений:
+
+- **Функция `redirect()`** – гибкий способ для выполнения редиректов.
+- **Классы `HttpResponseRedirect` и `HttpResponsePermanentRedirect`** – для явного указания кода перенаправления.
+- **Функция `reverse()`** – для вычисления URL-адресов на основе имен маршрутов.
+
+### Перенаправления с помощью функции redirect()
+
+#### **Пример 1: Перенаправление на главную страницу (файл `views.py`)**
+
+```python
+from django.shortcuts import redirect
+from django.http import HttpResponse
+
+def archive(request, year):
+    if year > 2023:
+        return redirect('/')  # Редирект на главную страницу
+    return HttpResponse(f"<h1>Архив по годам</h1><p>{year}</p>")
+```
+
+#### **Пример 2: Указание постоянного редиректа с кодом `301`**
+
+```python
+def archive(request, year):
+    if year > 2023:
+        return redirect('/', permanent=True)  # Постоянный редирект
+    return HttpResponse(f"<h1>Архив по годам</h1><p>{year}</p>")
+```
+
+#### **Пример 3: Редирект на представление вместо `URL`**
+
+```python
+from .views import index
+
+def archive(request, year):
+    if year > 2023:
+        return redirect(index, permanent=True)  # Редирект на функцию index
+    return HttpResponse(f"<h1>Архив по годам</h1><p>{year}</p>")
+```
+
+### Имена маршрутов и параметр name в path
+
+#### **Пример: Добавление имен маршрутов (файл `urls.py`)**
+
+```python
+from django.urls import path, re_path
+from . import views
+
+urlpatterns = [
+    path('', views.index, name='home'),  # Имя маршрута "home"
+    path('cats/<slug:cat_slug>/', views.categories_by_slug, name='cats'),  # Имя маршрута "cats"
+    re_path(r'^archive/(?P<year>[0-9]{4})/', views.archive, name='archive'),  # Имя маршрута "archive"
+]
+```
+
+**Использование имени**:
+
+```python
+def archive(request, year):
+    if year > 2023:
+        return redirect('home', permanent=True)  # Перенаправление на маршрут "home"
+    return HttpResponse(f"<h1>Архив по годам</h1><p>{year}</p>")
+```
+
+### Классы `HttpResponseRedirect` и `HttpResponsePermanentRedirect`
+
+Django предоставляет два класса для выполнения редиректов:
+
+- `HttpResponseRedirect` – для временного перенаправления (`код 302`).
+- `HttpResponsePermanentRedirect` – для постоянного перенаправления (`код 301`).
+
+---
+
+#### Пример: Использование HttpResponseRedirect (файл `views.py`)
+
+```python
+from django.http import HttpResponse, HttpResponseRedirect
+
+def archive(request, year):
+    if year > 2023:
+        return HttpResponseRedirect('/')  # Редирект на главную страницу
+    return HttpResponse(f"<h1>Архив по годам</h1><p>{year}</p>")
+```
+
+Функция `redirect()` в своей работе использует эти классы, но более гибкая в использовании.
+
+### Функция `reverse()`
+
+Функция `django.urls.reverse()` используется для `вычисления URL-адреса` маршрута на `основе его имени и переданных параметров`.
+
+#### Пример: Вычисление URL маршрута (файл `views.py`) и его использование.
+
+**Вычисление маршрута**:
+
+```python
+from django.urls import reverse
+from django.http import HttpResponseRedirect
+
+def archive(request, year):
+    if year > 2023:
+        url_redirect = reverse('cats', args=('music', ))  # Вычисление URL маршрута "cats" с параметром "music"
+        return HttpResponseRedirect(url_redirect)  # Редирект на вычисленный URL
+    return HttpResponse(f"<h1>Архив по годам</h1><p>{year}</p>")
+```
+
+**Использование вычисленного URL**:
+
+```python
+def archive(request, year):
+    if year > 2023:
+        url_redirect = reverse('cats', args=('music', ))  # Вычисление URL маршрута
+        return redirect(url_redirect)  # Редирект на вычисленный URL
+    return HttpResponse(f"<h1>Архив по годам</h1><p>{year}</p>")
+```
+
+**Результат**:
+
+Функция `reverse('cats', args=('music', ))` вычисляет `URL`:
+
+```ruby
+http://127.0.0.1:8000/cats/music/
+```
