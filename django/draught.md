@@ -908,3 +908,101 @@ def index(request):
   {% endif %} {% endfor %}
 </ul>
 ```
+
+## 2.5 Шаблонный тег url в Django
+
+Шаблонный тег `url` позволяет динамически формировать ссылки на основе имен маршрутов, заданных в `urls.py`.
+
+### Формирование ссылок в HTML
+
+В HTML ссылки создаются с помощью тега `<a>`:
+
+```html
+<a href="URL-адрес страницы">Название ссылки</a>
+```
+
+### Использование шаблонного тега `url`
+
+В Django можно динамически формировать URL с помощью имен маршрутов, заданных в файле `urls.py`.
+
+```python
+from django.urls import path
+from . import views
+
+urlpatterns = [
+    path('', views.index, name='home'),
+    path('about/', views.about, name='about'),
+    path('post/<int:post_id>/', views.show_post, name='post'),
+]
+```
+
+Создание представления `show_post`. В файле `views.py` добавим обработчик маршрута:
+
+```python
+from django.http import HttpResponse
+
+def show_post(request, post_id):
+    return HttpResponse(f"Отображение статьи с id = {post_id}")
+```
+
+Используем тег `url` для динамического формирования ссылок в шаблоне `index.html`:
+
+```html
+<p><a href="{% url 'post' p.id %}">Читать пост</a></p>
+```
+
+Таким образом, любое изменение маршрутов в `urls.py` автоматически отразится в шаблонах без необходимости их редактирования.
+
+### Формирование главного меню
+
+Добавим маршруты в `urls.py`:
+
+```python
+urlpatterns = [
+    path('', views.index, name='home'),
+    path('about/', views.about, name='about'),
+    path('addpage/', views.addpage, name='add_page'),
+    path('contact/', views.contact, name='contact'),
+    path('login/', views.login, name='login'),
+    path('post/<int:post_id>/', views.show_post, name='post'),
+]
+```
+
+Добавим меню в `views.py`:
+
+```python
+menu = [
+    {'title': "О сайте", 'url_name': 'about'},
+    {'title': "Добавить статью", 'url_name': 'add_page'},
+    {'title': "Обратная связь", 'url_name': 'contact'},
+    {'title': "Войти", 'url_name': 'login'}
+]
+```
+
+Дополнительно создадим представления-заглушки:
+
+```python
+def addpage(request):
+    return HttpResponse("Добавление статьи")
+
+def contact(request):
+    return HttpResponse("Обратная связь")
+
+def login(request):
+    return HttpResponse("Авторизация")
+```
+
+Теперь выведем главное меню в шаблоне `index.html`:
+
+```html
+<ul>
+  <li><a href="{% url 'home' %}">Главная</a></li>
+  {% for m in menu %} {% if not forloop.last %}
+  <li>{% else %}</li>
+  <li class="last">
+    {% endif %}
+    <a href="{% url m.url_name %}">{{ m.title }}</a>
+  </li>
+  {% endfor %}
+</ul>
+```
