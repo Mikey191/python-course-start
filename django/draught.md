@@ -769,3 +769,142 @@ def index(request):
 <p>{{ dict.key_1 }}</p>
 <p>{{ obj.a }}</p>
 ```
+
+## 2.3 Стандартные шаблонные фильтры в Django
+
+Фильтры - это удобный инструмент, позволяющий изменять отображение данных в шаблонах без необходимости изменять логику Python-кода.
+
+### Основные принципы работы с фильтрами
+
+Фильтры в Django применяются в шаблонах с использованием **вертикальной черты (`|`)**. Если фильтр принимает аргументы, они передаются через двоеточие `:`.
+
+```html
+<p>{{ number|add:"10" }}</p>
+```
+
+### Основные стандартные фильтры
+
+- `add` – Прибавление чисел.
+- `capfirst` – Заглавная буква в начале строки.
+- `upper` и `lower` – Преобразование регистра.
+- `cut` – Удаление фрагмента строки.
+- `default` – Значение по умолчанию.
+- `divisibleby` – Проверка делимости
+- `first` и `last` – Первый и последний элементы списка
+- `join` – Объединение списка в строку
+- `length` – Длина списка
+- `slugify` – Создание slug
+
+### Использование фильтров в Python
+
+Фильтры можно применять не только в шаблонах, но и в коде Python. Они доступны в модуле `django.template.defaultfilters`.
+
+Пример использования `slugify` в Python:
+
+```python
+from django.template.defaultfilters import slugify
+
+data = {
+    'title': 'Главная страница',
+    'url': slugify("The main page"),
+}
+
+print(data['url'])  # the-main-page
+```
+
+В шаблоне можно вывести `url` так:
+
+```html
+<p>{{ url }}</p>
+```
+
+## 2.4 Теги шаблонов в Django: if и for
+
+### Использование тега `for`
+
+**Допустим, у нас есть список данных о известных женщинах**:
+
+```python
+# Имитация базы данных
+data_db = [
+    {'id': 1, 'title': 'Анджелина Джоли', 'content': 'Биография Анджелины Джоли', 'is_published': True},
+    {'id': 2, 'title': 'Марго Робби', 'content': 'Биография Марго Робби', 'is_published': False},
+    {'id': 3, 'title': 'Джулия Робертс', 'content': 'Биография Джулии Робертс', 'is_published': True},
+]
+```
+
+**Создадим представление `index`, которое передаст эти данные в шаблон**:
+
+```python
+def index(request):
+    data = {
+        'title': 'Главная страница',
+        'menu': ['Главная', 'О сайте', 'Контакты'],
+        'posts': data_db,
+    }
+    return render(request, 'women/index.html', context=data)
+```
+
+**Теперь выведем этот список в шаблоне `index.html`**:
+
+```html
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>{{ title }}</title>
+  </head>
+  <body>
+    <p>{{ menu|join:" | " }}</p>
+    <h1>{{ title }}</h1>
+
+    <ul>
+      {% for p in posts %}
+      <li>
+        <h2>{{ p.title }}</h2>
+        <p>{{ p.content }}</p>
+        <hr />
+      </li>
+      {% endfor %}
+    </ul>
+  </body>
+</html>
+```
+
+### Добавление условия `if`
+
+В текущем шаблоне выводятся все статьи, включая те, у которых `is_published` равно `False`. Давайте исправим это с помощью тега `if`:
+
+```html
+<ul>
+  {% for p in posts %} {% if p.is_published %}
+  <li>
+    <h2>{{ p.title }}</h2>
+    <p>{{ p.content }}</p>
+    {% if not forloop.last %}
+    <hr />
+    {% endif %}
+  </li>
+  {% endif %} {% endfor %}
+</ul>
+```
+
+- Проверяем `p.is_published`, чтобы скрыть неопубликованные статьи.
+- Используем `{% if not forloop.last %}` для исключения последней горизонтальной черты (`<hr>`).
+
+### Использование переменных `forloop`
+
+- `forloop.counter` – номер текущей итерации (с 1);
+- `forloop.counter0` – номер текущей итерации (с 0);
+- `forloop.first` – `True` на первой итерации;
+- `forloop.last` – `True` на последней итерации.
+
+```html
+<ul>
+  {% for p in posts %} {% if p.is_published %}
+  <li>
+    <h2>{{ forloop.counter }}. {{ p.title }}</h2>
+    <p>{{ p.content }}</p>
+  </li>
+  {% endif %} {% endfor %}
+</ul>
+```
