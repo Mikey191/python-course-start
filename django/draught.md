@@ -595,3 +595,177 @@ def archive(request, year):
 ```ruby
 http://127.0.0.1:8000/cats/music/
 ```
+
+# 2. Шаблоны
+
+## 2.1 Введение в шаблоны Django: функции `render()` и `render_to_string()`
+
+### Где хранить шаблоны
+
+```
+project_root/
+│── women/
+│   ├── templates/
+│   │   ├── women/
+│   │   │   ├── index.html
+│   │   │   ├── about.html
+```
+
+Чтобы избежать конфликтов имен файлов, принято создавать подкаталог с именем самого приложения.
+
+### Функция `render_to_string()`
+
+Функция `render_to_string()` загружает шаблон, обрабатывает его и возвращает HTML-код в виде строки.
+
+**Создадим файл `templates/women/index.html`**:
+
+```html
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Главная страница</title>
+  </head>
+  <body>
+    <h1>Главная страница</h1>
+  </body>
+</html>
+```
+
+**Используем функцию `render_to_string()`**:
+
+```python
+from django.template.loader import render_to_string
+
+def index(request):
+    t = render_to_string('women/index.html')
+    return HttpResponse(t)
+```
+
+### Функция `render()`
+
+Функция `render()` объединяет загрузку шаблона и формирование HTTP-ответа в одну строку кода:
+
+```python
+from django.shortcuts import render
+
+def index(request):
+    return render(request, 'women/index.html')
+```
+
+Более краткая альтернатива использования функции `render_to_string`.
+
+### Настройки шаблонизатора Django
+
+Django использует встроенный шаблонизатор, указанный в файле `settings.py`:
+
+```python
+TEMPLATES = [
+    {
+        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        'DIRS': [],
+        'APP_DIRS': True,
+        'OPTIONS': {
+            'context_processors': [
+                'django.template.context_processors.debug',
+                'django.template.context_processors.request',
+                'django.contrib.auth.context_processors.auth',
+                'django.contrib.messages.context_processors.messages',
+            ],
+        },
+    },
+]
+```
+
+Здесь важны два параметра:
+
+- `DIRS` – позволяет указать нестандартные пути к шаблонам.
+- `APP_DIRS` – если `True`, Django ищет шаблоны внутри приложений.
+
+Если `APP_DIRS=False`, а `DIRS` пуст, при загрузке страницы появится ошибка `TemplateDoesNotExist`.
+
+## 2.2 Передача данных (переменных) в шаблоны Django
+
+Шаблоны в Django позволяют динамически изменять содержимое веб-страниц, подставляя в них значения переменных, полученных из представлений.
+
+1. В файле шаблона (`index.html` или `about.html`) указываются переменные в двойных фигурных скобках `{{ ... }}`.
+2. В представлении формируется словарь с данными и передается в шаблон.
+3. Django автоматически подставляет значения переменных в соответствующие места в шаблоне.
+
+### Передача одной переменной в шаблон
+
+```html
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>{{ title }}</title>
+  </head>
+  <body>
+    <h1>{{ title }}</h1>
+  </body>
+</html>
+```
+
+Теперь в представлении передадим эту переменную:
+
+```python
+def index(request):
+    data = {'title': 'Главная страница'}
+    return render(request, 'women/index.html', data)
+```
+
+При загрузке страницы вместо `{{ title }}` подставится строка "Главная страница".
+
+### Обращение к коллекциям в шаблонах
+
+Передавать переменные в шаблон нужно явно.
+
+```python
+class MyClass:
+    def __init__(self, a, b):
+        self.a = a
+        self.b = b
+
+
+def index(request):
+    data = {
+        'title': 'Главная страница',
+        'menu': menu,
+        'float': 28.56,
+        'lst': [1, 2, 'abc', True],
+        'set': {1, 2, 3, 5},
+        'dict': {'key_1': 'value_1', 'key_2': 'value_2'},
+        'obj': MyClass(10, 20),
+    }
+    return render(request, 'women/index.html', context=data)
+```
+
+Шаблон `index.html`:
+
+```html
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>{{ title }}</title>
+  </head>
+  <body>
+    <p>{{ menu }}</p>
+    <p>{{ float }}</p>
+    <p>{{ lst }}</p>
+    <p>{{ set }}</p>
+    <p>{{ dict }}</p>
+    <p>{{ obj }}</p>
+
+    <h1>{{ title }}</h1>
+  </body>
+</html>
+```
+
+### Обращение к атрибутам объектов
+
+Ключи словарей и атрибуты классов можно выводить через точку:
+
+```html
+<p>{{ dict.key_1 }}</p>
+<p>{{ obj.a }}</p>
+```
