@@ -1009,59 +1009,65 @@ def login(request):
 
 ## 2.6 Наследование шаблонов (extends). Тег include
 
-Дублирование кода в шаблонах ведет к усложнению поддержки и снижению масштабируемости проекта. 
+Дублирование кода в шаблонах ведет к усложнению поддержки и снижению масштабируемости проекта.
 
 Если необходимо изменить меню или структуру страницы, придется вносить исправления сразу в нескольких файлах, что увеличивает вероятность ошибок.
 
 Допустим имеется два файла `index.html` и `about.html`. В них присутствует дублирование кода: `заголовок`, `меню` и `базовая структура` **повторяются в каждом файле**. Это нарушает принцип **`DRY` (Don't Repeat Yourself)**.
 
-- `index.html`: 
+- `index.html`:
+
 ```html
 <!DOCTYPE html>
 <html>
-<head>
+  <head>
     <title>{{ title }}</title>
-</head>
-<body>
+  </head>
+  <body>
     <ul>
-        <li><a href="{% url 'home' %}">Главная</a></li>
-        {% for m in menu %}
-        {% if not forloop.last %}<li>{% else %}<li class="last">{% endif %}
-            <a href="{% url m.url_name %}">{{ m.title }}</a>
-        </li>
-        {% endfor %}
+      <li><a href="{% url 'home' %}">Главная</a></li>
+      {% for m in menu %} {% if not forloop.last %}
+      <li>{% else %}</li>
+      <li class="last">
+        {% endif %}
+        <a href="{% url m.url_name %}">{{ m.title }}</a>
+      </li>
+      {% endfor %}
     </ul>
     <h1>{{ title }}</h1>
     <ul>
-        {% for post in posts %}
-        <li>
-            <h2>{{ post.title }}</h2>
-            <p>{{ post.content }}</p>
-        </li>
-        {% endfor %}
+      {% for post in posts %}
+      <li>
+        <h2>{{ post.title }}</h2>
+        <p>{{ post.content }}</p>
+      </li>
+      {% endfor %}
     </ul>
-</body>
+  </body>
 </html>
 ```
 
 - `about.html`:
+
 ```html
 <!DOCTYPE html>
 <html>
-<head>
+  <head>
     <title>{{ title }}</title>
-</head>
-<body>
+  </head>
+  <body>
     <ul>
-        <li><a href="{% url 'home' %}">Главная</a></li>
-        {% for m in menu %}
-        {% if not forloop.last %}<li>{% else %}<li class="last">{% endif %}
-            <a href="{% url m.url_name %}">{{ m.title }}</a>
-        </li>
-        {% endfor %}
+      <li><a href="{% url 'home' %}">Главная</a></li>
+      {% for m in menu %} {% if not forloop.last %}
+      <li>{% else %}</li>
+      <li class="last">
+        {% endif %}
+        <a href="{% url m.url_name %}">{{ m.title }}</a>
+      </li>
+      {% endfor %}
     </ul>
     <h1>{{ title }}</h1>
-</body>
+  </body>
 </html>
 ```
 
@@ -1069,31 +1075,33 @@ def login(request):
 
 Создадим директорию `templates` в корне проекта `sitewomen` и добавим в нее файл `base.html` (`sitewomen/templates/base.html`):
 
-
 #### `base.html`
+
 ```html
 <!DOCTYPE html>
 <html>
-<head>
+  <head>
     <title>{{ title }}</title>
-</head>
-<body>
+  </head>
+  <body>
     <ul>
-        <li><a href="{% url 'home' %}">Главная</a></li>
-        {% for m in menu %}
-        {% if not forloop.last %}<li>{% else %}<li class="last">{% endif %}
-            <a href="{% url m.url_name %}">{{ m.title }}</a>
-        </li>
-        {% endfor %}
+      <li><a href="{% url 'home' %}">Главная</a></li>
+      {% for m in menu %} {% if not forloop.last %}
+      <li>{% else %}</li>
+      <li class="last">
+        {% endif %}
+        <a href="{% url m.url_name %}">{{ m.title }}</a>
+      </li>
+      {% endfor %}
     </ul>
     {% block content %}{% endblock %}
-</body>
+  </body>
 </html>
 ```
 
 Строка `{% block content %}{% endblock %}` определяет блок контента, который может быть **переопределён в дочерних шаблонах**. **Это ключевая часть механизма наследования шаблонов в Django**.
 
-**Функционал наследования** шаблонов в Django **поддерживается** благодаря тегу `{% block %}`, который используется для определения блоков контента, доступных для переопределения в дочерних шаблонах. 
+**Функционал наследования** шаблонов в Django **поддерживается** благодаря тегу `{% block %}`, который используется для определения блоков контента, доступных для переопределения в дочерних шаблонах.
 
 Однако **имя блока**, например `content`, **является произвольным** и **задаётся разработчиком**. То есть, не обязательно использовать именно `block content`, вы можете назвать блок любым именем, например, `block main`, `block body`, или даже `block my_custom_block`.
 
@@ -1144,18 +1152,19 @@ TEMPLATES = [
 Предположим, мы хотим повторно использовать навигационное меню на нескольких страницах. Вместо дублирования кода создадим отдельный файл `nav.html`.
 
 1. Создадим файл `women/templates/women/includes/nav.html`
+
 ```html
 <nav>
   <a href="#">Актрисы</a> | <a href="#">Певицы</a> |
   <a href="#">Спортсменки</a>
 </nav>
 ```
+
 2. Подключим его в `index.html`
 
 ```html
-{% extends 'base.html' %} 
-{% block content %} 
-{% include 'women/includes/nav.html' %}
+{% extends 'base.html' %} {% block content %} {% include
+'women/includes/nav.html' %}
 <h1>{{ title }}</h1>
 <ul>
   {% for post in posts %}
@@ -1165,8 +1174,7 @@ TEMPLATES = [
   </li>
   {% endfor %}
 </ul>
-{% include 'women/includes/nav.html' %}
-{% endblock %}
+{% include 'women/includes/nav.html' %} {% endblock %}
 ```
 
 ### Особенности `{% include %}`
@@ -1181,3 +1189,98 @@ TEMPLATES = [
    ```html
    {% include 'women/includes/nav.html' with title='Заголовок' %}
    ```
+
+## 2.7 Подключение статических файлов в Django
+
+Корректное подключение статических файлов позволяет:
+
+- Улучшить внешний вид страниц с помощью CSS.
+- Добавить динамическое поведение с помощью JavaScript.
+- Использовать изображения и другие медиафайлы.
+
+Однако, есть нюансы в зависимости от режима работы Django:
+
+- **Режим отладки (DEBUG=True)** – Django автоматически ищет файлы в папках `static` установленных приложений.
+- **Режим эксплуатации (DEBUG=False)** – Статические файлы должны находиться в общей папке проекта.
+
+### Настройка статических файлов в Django
+
+Для работы со статическими файлами Django использует три ключевых параметра в `settings.py`:
+
+```python
+STATIC_URL = '/static/'  # URL-префикс для статических файлов
+
+STATIC_ROOT = BASE_DIR / 'staticfiles'  # Папка для сбора статических файлов (используется при collectstatic)
+
+STATICFILES_DIRS = [
+    BASE_DIR / 'static'  # Дополнительные пути для поиска статических файлов
+]
+```
+
+Кроме того, в `INSTALLED_APPS` обязательно должно присутствовать приложение `django.contrib.staticfiles`:
+
+```python
+INSTALLED_APPS = [
+    ...
+    'django.contrib.staticfiles',
+    ...
+]
+```
+
+Если его нет, статические файлы работать не будут.
+
+### Организация структуры статических файлов
+
+```
+women/
+│── static/
+│   ├── women/
+│   │   ├── css/
+│   │   │   ├── styles.css
+│   │   ├── js/
+│   │   │   ├── scripts.js
+│   │   ├── images/
+│   │   │   ├── logo.png
+```
+
+### Подключение статических файлов в шаблонах
+
+Для использования статических файлов в шаблоне необходимо сначала загрузить тег `static`:
+
+```django
+{% load static %}
+```
+
+После этого можно подключать файлы:
+
+```django
+<link rel="stylesheet" type="text/css" href="{% static 'women/css/styles.css' %}">
+<script src="{% static 'women/js/scripts.js' %}"></script>
+<img src="{% static 'women/images/logo.png' %}" alt="Logo">
+```
+
+При рендеринге страницы Django автоматически подставит корректные пути, например:
+
+```html
+<link rel="stylesheet" type="text/css" href="/static/women/css/styles.css" />
+```
+
+### Сбор статических файлов для продакшена
+
+При развертывании на сервере все статические файлы должны быть собраны в одну папку. Для этого используется команда:
+
+```sh
+python manage.py collectstatic
+```
+
+Она копирует файлы из `static` всех приложений в `STATIC_ROOT`. На сервере веб-сервер (например, Nginx) будет обслуживать эти файлы напрямую.
+
+### Работа в режиме DEBUG=False
+
+При отключенном отладочном режиме (`DEBUG=False`) Django не раздает статические файлы по умолчанию. Для локального тестирования можно использовать команду:
+
+```sh
+python manage.py runserver --insecure
+```
+
+Однако, в боевом режиме веб-сервер (например, Nginx или Apache) должен быть настроен на раздачу этих файлов из `STATIC_ROOT`.
