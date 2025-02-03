@@ -1006,3 +1006,178 @@ def login(request):
   {% endfor %}
 </ul>
 ```
+
+## 2.6 Наследование шаблонов (extends). Тег include
+
+Дублирование кода в шаблонах ведет к усложнению поддержки и снижению масштабируемости проекта. 
+
+Если необходимо изменить меню или структуру страницы, придется вносить исправления сразу в нескольких файлах, что увеличивает вероятность ошибок.
+
+Допустим имеется два файла `index.html` и `about.html`. В них присутствует дублирование кода: `заголовок`, `меню` и `базовая структура` **повторяются в каждом файле**. Это нарушает принцип **`DRY` (Don't Repeat Yourself)**.
+
+- `index.html`: 
+```html
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{{ title }}</title>
+</head>
+<body>
+    <ul>
+        <li><a href="{% url 'home' %}">Главная</a></li>
+        {% for m in menu %}
+        {% if not forloop.last %}<li>{% else %}<li class="last">{% endif %}
+            <a href="{% url m.url_name %}">{{ m.title }}</a>
+        </li>
+        {% endfor %}
+    </ul>
+    <h1>{{ title }}</h1>
+    <ul>
+        {% for post in posts %}
+        <li>
+            <h2>{{ post.title }}</h2>
+            <p>{{ post.content }}</p>
+        </li>
+        {% endfor %}
+    </ul>
+</body>
+</html>
+```
+
+- `about.html`:
+```html
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{{ title }}</title>
+</head>
+<body>
+    <ul>
+        <li><a href="{% url 'home' %}">Главная</a></li>
+        {% for m in menu %}
+        {% if not forloop.last %}<li>{% else %}<li class="last">{% endif %}
+            <a href="{% url m.url_name %}">{{ m.title }}</a>
+        </li>
+        {% endfor %}
+    </ul>
+    <h1>{{ title }}</h1>
+</body>
+</html>
+```
+
+### Создание базового шаблона
+
+Создадим директорию `templates` в корне проекта `sitewomen` и добавим в нее файл `base.html` (`sitewomen/templates/base.html`):
+
+
+#### `base.html`
+```html
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{{ title }}</title>
+</head>
+<body>
+    <ul>
+        <li><a href="{% url 'home' %}">Главная</a></li>
+        {% for m in menu %}
+        {% if not forloop.last %}<li>{% else %}<li class="last">{% endif %}
+            <a href="{% url m.url_name %}">{{ m.title }}</a>
+        </li>
+        {% endfor %}
+    </ul>
+    {% block content %}{% endblock %}
+</body>
+</html>
+```
+
+Строка `{% block content %}{% endblock %}` определяет блок контента, который может быть **переопределён в дочерних шаблонах**. **Это ключевая часть механизма наследования шаблонов в Django**.
+
+**Функционал наследования** шаблонов в Django **поддерживается** благодаря тегу `{% block %}`, который используется для определения блоков контента, доступных для переопределения в дочерних шаблонах. 
+
+Однако **имя блока**, например `content`, **является произвольным** и **задаётся разработчиком**. То есть, не обязательно использовать именно `block content`, вы можете назвать блок любым именем, например, `block main`, `block body`, или даже `block my_custom_block`.
+
+#### Новый `index.html`
+
+```html
+{% extends 'base.html' %} {% block content %}
+<h1>{{ title }}</h1>
+<ul>
+  {% for post in posts %}
+  <li>
+    <h2>{{ post.title }}</h2>
+    <p>{{ post.content }}</p>
+  </li>
+  {% endfor %}
+</ul>
+{% endblock %}
+```
+
+#### Новый `about.html`
+
+```html
+{% extends 'base.html' %} {% block content %}
+<h1>{{ title }}</h1>
+<p>Этот сайт содержит информацию о различных известных женщинах.</p>
+{% endblock %}
+```
+
+### Добавление каталога шаблонов в `settings.py`
+
+Чтобы Django мог находить `base.html`, нужно прописать путь в `settings.py`. Это изменение актуально только для глобальных шаблонов, а не для тех, что находятся в папках приложения:
+
+Чтобы Django мог находить `base.html`, нужно прописать путь в `settings.py`:
+
+```python
+TEMPLATES = [
+    {
+        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        'DIRS': [BASE_DIR / 'templates'],
+        'APP_DIRS': True,
+        ...
+    },
+]
+```
+
+### Включение фрагментов с помощью `{% include %}`
+
+Предположим, мы хотим повторно использовать навигационное меню на нескольких страницах. Вместо дублирования кода создадим отдельный файл `nav.html`.
+
+1. Создадим файл `women/templates/women/includes/nav.html`
+```html
+<nav>
+  <a href="#">Актрисы</a> | <a href="#">Певицы</a> |
+  <a href="#">Спортсменки</a>
+</nav>
+```
+2. Подключим его в `index.html`
+
+```html
+{% extends 'base.html' %} 
+{% block content %} 
+{% include 'women/includes/nav.html' %}
+<h1>{{ title }}</h1>
+<ul>
+  {% for post in posts %}
+  <li>
+    <h2>{{ post.title }}</h2>
+    <p>{{ post.content }}</p>
+  </li>
+  {% endfor %}
+</ul>
+{% include 'women/includes/nav.html' %}
+{% endblock %}
+```
+
+### Особенности `{% include %}`
+
+1. **Доступ к переменным**: Подключенный шаблон имеет доступ к переменным основного шаблона.
+2. **Запрет передачи данных**: Если нужно запретить передачу данных, используем `only`:
+   ```html
+   {% include 'women/includes/nav.html' only %}
+   ```
+   Например, если в `base.html` есть переменная `menu`, а в `nav.html` она не используется, то `only` предотвратит её передачу и уменьшит потенциальные конфликты.
+3. **Передача отдельных параметров**: Можно передавать параметры через `with`:
+   ```html
+   {% include 'women/includes/nav.html' with title='Заголовок' %}
+   ```
