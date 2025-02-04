@@ -1284,3 +1284,134 @@ python manage.py runserver --insecure
 ```
 
 Однако, в боевом режиме веб-сервер (например, Nginx или Apache) должен быть настроен на раздачу этих файлов из `STATIC_ROOT`.
+
+## 2.8 Пользовательские теги шаблонов. Декораторы `simple_tag` и `inclusion_tag`
+
+Django позволяет определять два типа пользовательских тегов:
+
+- `simple_tag` — простые теги, возвращающие данные.
+- `inclusion_tag` — включающие теги, рендерящие отдельные шаблоны.
+
+### Создание `simple_tag`
+
+`simple_tag` позволяет выполнять операции и возвращать данные непосредственно в шаблон.
+
+#### Пошаговая реализация:
+
+- В файле `women/views.py` определяем коллекцию `cats_db`:
+  ```python
+  cats_db = [
+      {'id': 1, 'name': 'Актрисы'},
+      {'id': 2, 'name': 'Певицы'},
+      {'id': 3, 'name': 'Спортсменки'},
+  ]
+  ```
+- Создаем каталог `templatetags` в приложении `women`.
+- Добавляем в этот каталог файл `__init__.py`, чтобы сделать его пакетом.
+- Создаем новый файл `women_tags.py`. Импортируем нужные модули, определяем функцию, которая будет возвращать список категорий:
+
+  ```python
+  from django import template
+  import women.views as views
+
+  register = template.Library()
+
+  @register.simple_tag()
+  def get_categories():
+      return views.cats_db
+  ```
+
+- В `base.html` загружаем теги:
+  ```django
+  {% load women_tags %}
+  ```
+- Используем тег в шаблоне:
+  ```django
+  {% get_categories as categories %}
+  <ul>
+      {% for cat in categories %}
+          <li><a href="#">{{ cat.name }}</a></li>
+      {% endfor %}
+  </ul>
+  ```
+
+#### Тег можно переименовать, задав имя в декораторе:
+
+```python
+@register.simple_tag(name='getcats')
+def get_categories():
+    return views.cats_db
+```
+
+Использование переименованного пользовательского тега:
+
+```django
+{% getcats as categories %}
+<ul>
+    {% for cat in categories %}
+        <li><a href="#">{{ cat.name }}</a></li>
+    {% endfor %}
+</ul>
+```
+
+### Создание `inclusion_tag`
+
+`inclusion_tag` позволяет возвращать отрендеренный шаблон.
+
+- В `women_tags.py` добавляем:
+  ```python
+  @register.inclusion_tag('women/list_categories.html')
+  def show_categories():
+      return {"cats": views.cats_db}
+  ```
+- Создаем шаблон `women/list_categories.html`:
+
+  ```django
+  {% for cat in cats %}
+      <li><a href="{% url 'category' cat.id %}">{{ cat.name }}</a></li>
+  {% endfor %}
+  ```
+
+- Используем тег в `base.html`:
+
+  ```django
+  {% show_categories %}
+  ```
+
+### Передача параметров в теги
+
+- Модифицируем функцию `show_categories`:
+
+  ```python
+  @register.inclusion_tag('women/list_categories.html')
+  def show_categories(cat_selected=0):
+      return {"cats": views.cats_db, "cat_selected": cat_selected}
+  ```
+
+- В `list_categories.html` добавляем выделение активной категории:
+
+  ```django
+  {% for cat in cats %}
+      {% if cat.id == cat_selected %}
+          <li class="selected">{{ cat.name }}</li>
+      {% else %}
+          <li><a href="{% url 'category' cat.id %}">{{ cat.name }}</a></li>
+      {% endif %}
+  {% endfor %}
+  ```
+
+- Вызываем тег с параметром в `base.html`:
+
+  ```django
+  {% show_categories cat_selected %}
+  ```
+
+- Передаем `cat_selected` в контекст представлений:
+
+  ```python
+  def index(request):
+      return render(request, 'women/index.html', {"cat_selected": 0})
+
+  def show_category(request, cat_id):
+      return render(request, 'women/index.html', {"cat_selected": cat_id})
+  ```
