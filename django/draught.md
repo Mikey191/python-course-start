@@ -1523,3 +1523,145 @@ class Women(models.Model):
 - **Если отношения между моделями** – `ForeignKey`, `OneToOneField`, `ManyToManyField()`.
 
 **Полный список полей можно найти в документации**
+
+## 3.2 Создание и запуск файлов миграций в Django
+
+Механизм миграций позволяет автоматически формировать и изменять структуру базы данных с помощью специальных файлов миграций.
+
+Миграция — это специальный Python-файл (модуль), который содержит инструкции на уровне ORM-интерфейса для создания или изменения структуры базы данных.
+
+Django использует миграции как систему управления версиями схемы БД, позволяя:
+
+- Создавать новые таблицы
+- Изменять уже существующие таблицы (добавление/удаление столбцов, изменение их свойств)
+- Управлять связями между таблицами
+- Откатывать изменения к предыдущей версии
+
+Миграции хранятся в папке `migrations` внутри каждого приложения Django и отслеживают изменения в моделях с момента последнего выполнения миграции.
+
+### Генерация файла миграции
+
+Открываем терминал и из корневого каталога проекта выполняем команду:
+
+```bash
+python manage.py makemigrations
+```
+
+После выполнения этой команды Django создаст новый файл миграции внутри каталога `migrations` нашего приложения (`women`). **Команда `makemigrations` **обязательно** выполняется каждый раз после изменения моделей. В противном случае изменения не будут применены в БД**.
+
+```python
+# women/migrations/0001_initial.py
+from django.db import migrations, models
+
+class Migration(migrations.Migration):
+    initial = True
+
+    dependencies = []
+
+    operations = [
+        migrations.CreateModel(
+            name='Women',
+            fields=[
+                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('title', models.CharField(max_length=255)),
+                ('content', models.TextField(blank=True)),
+                ('time_create', models.DateTimeField(auto_now_add=True)),
+                ('time_update', models.DateTimeField(auto_now=True)),
+                ('is_published', models.BooleanField(default=True)),
+            ],
+        ),
+    ]
+```
+
+### Просмотр SQL-кода миграции
+
+```bash
+python manage.py sqlmigrate women 0001
+```
+
+Где `women` — название приложения, а `0001` — номер миграции (без `_initial.py`).
+
+Пример вывода SQL-запроса:
+
+```sql
+CREATE TABLE "women_women" (
+    "id" bigint NOT NULL PRIMARY KEY,
+    "title" varchar(255) NOT NULL,
+    "content" text NOT NULL,
+    "time_create" datetime NOT NULL,
+    "time_update" datetime NOT NULL,
+    "is_published" bool NOT NULL DEFAULT true
+);
+```
+
+### Применение миграций к базе данных
+
+```bash
+python manage.py migrate
+```
+
+При первом запуске Django применит **все** необходимые миграции, включая те, которые относятся к стандартным приложениям (`auth`, `admin`, `sessions` и т. д.).
+
+**Пример таблицы в БД**:
+
+```
+| id | title      | content        | time_create      | time_update      | is_published |
+|----|-------     |---------       |-------------     |-------------     |------------- |
+| 1  | "Статья 1" | "Текст статьи" | 2024-01-01 10:00 | 2024-01-01 10:00 | True         |
+```
+
+### Удаление и откат миграций
+
+```bash
+python manage.py migrate women 0000
+```
+
+Где `0000` означает удаление всех миграций и возврат к начальному состоянию.
+
+Если необходимо удалить **конкретную** миграцию, сначала удаляем файл из `migrations`, затем выполняем:
+
+```bash
+python manage.py migrate women имя_предыдущей_миграции
+```
+
+### Схема файлов и взаимодействий
+
+1. **Модель**: `women/models.py`
+
+   ```python
+   from django.db import models
+
+   class Women(models.Model):
+       title = models.CharField(max_length=255)
+       content = models.TextField(blank=True)
+       time_create = models.DateTimeField(auto_now_add=True)
+       time_update = models.DateTimeField(auto_now=True)
+       is_published = models.BooleanField(default=True)
+   ```
+
+2. **Генерация миграции**:
+
+   ```bash
+   python manage.py makemigrations
+   ```
+
+   - Создает `women/migrations/0001_initial.py`
+
+3. **Просмотр SQL-запроса**:
+
+   ```bash
+   python manage.py sqlmigrate women 0001
+   ```
+
+4. **Применение миграции**:
+
+   ```bash
+   python manage.py migrate
+   ```
+
+   - Изменения фиксируются в БД.
+
+5. **Откат миграции**:
+   ```bash
+   python manage.py migrate women 0000
+   ```
