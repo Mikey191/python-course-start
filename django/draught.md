@@ -1665,3 +1665,97 @@ python manage.py migrate women имя_предыдущей_миграции
    ```bash
    python manage.py migrate women 0000
    ```
+
+## 3.3 Понятие CRUD. Добавление записей в таблицу БД. Модуль django-extensions
+
+Базовые операции для работы с таблицей:
+
+- **Create** – создание;
+- **Read** – чтение;
+- **Update** – обновление;
+- **Delete** – удаление.
+
+### Добавление записей в таблицу с помощью Django ORM
+
+- **Открытие Django shell**:
+  ```bash
+  python manage.py shell
+  ```
+- **Импорт модели**:
+  ```python
+  from women.models import Women
+  ```
+- **Создание объекта модели**:
+  ```python
+  w1 = Women(title='Анджелина Джоли', content='Биография Анджелины Джоли')
+  ```
+- **Сохранение объекта в БД**:
+  ```python
+  w1.save()
+  ```
+- Альтернативный способ создания записей
+  ```python
+  w2 = Women()
+  w2.title = 'Энн Хэтэуэй'
+  w2.content = 'Биография Энн Хэтэуэй'
+  w2.save()
+  ```
+
+### Просмотр SQL-запросов
+
+Django позволяет просматривать выполняемые SQL-запросы:
+
+```python
+from django.db import connection
+print(connection.queries)
+```
+
+Чтобы создать новую запись и сразу выполнить SQL-запрос, можно использовать `create()`:
+
+```python
+Women.objects.create(title='Джулия Робертс', content='Биография Джулии Робертс')
+```
+
+### Установка `ipython` для улучшенной консоли
+
+```bash
+pip install ipython
+```
+
+Запускаем Django shell с улучшенными возможностями:
+
+```bash
+python manage.py shell
+```
+
+### Установка django-extensions
+
+```bash
+pip install django-extensions
+```
+
+Добавим его в `INSTALLED_APPS` в `settings.py`:
+
+```python
+INSTALLED_APPS = [
+    ...
+    'django_extensions',
+]
+```
+
+После установки доступна расширенная консоль `shell_plus`, которая автоматически импортирует все модели и показывает SQL-запросы:
+
+```bash
+python manage.py shell_plus --print-sql
+```
+
+```python
+a = Women(title="Екатерина Гусева", content="Биография Екатерины Гусевой")
+a.save()
+```
+
+**Результат**:
+
+```sql
+INSERT INTO women_women (title, content, time_create, time_update, is_published) VALUES ('Екатерина Гусева', 'Биография Екатерины Гусевой', '2025-01-24 12:00:00', '2025-01-24 12:00:00', 1);
+```
