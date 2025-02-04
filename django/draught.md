@@ -1415,3 +1415,111 @@ def get_categories():
   def show_category(request, cat_id):
       return render(request, 'women/index.html', {"cat_selected": cat_id})
   ```
+
+# 3. Введение в ORM и модели
+
+## 3.1 Что такое БД, SQL и ORM. Создание первой модели
+
+Django поддерживает работу со следующими СУБД:
+
+- PostgreSQL
+- MariaDB
+- MySQL
+- Oracle
+- SQLite
+
+### ORM в Django
+
+`ORM (Object-Relational Mapping)` в Django позволяет абстрагироваться от SQL и работать с базой данных через классы и объекты Python.
+
+Он обеспечивает универсальность кода, позволяя изменять БД без замены логики.
+
+### Настройка БД в Django
+
+В Django база данных настраивается в `settings.py`:
+
+```python
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
+    }
+}
+```
+
+### Создание первой модели
+
+В `models.py` опишем модель:
+
+```python
+from django.db import models
+
+class Women(models.Model):
+    title = models.CharField(max_length=255)
+    content = models.TextField(blank=True)
+    time_create = models.DateTimeField(auto_now_add=True)
+    time_update = models.DateTimeField(auto_now=True)
+    is_published = models.BooleanField(default=True)
+```
+
+### Описание полей
+
+- `id` (создается автоматически)
+- `title` - строковое поле с ограничением в 255 символов
+- `content` - текстовое поле
+- `time_create` - время создания
+- `time_update` - время обновления
+- `is_published` - флаг публикации
+
+### Типы полей в модели Django ORM:
+
+#### 1. Числовые поля
+
+- `IntegerField()` – целое число (от -2147483648 до 2147483647).
+- `PositiveIntegerField()` – положительное целое число.
+- `BigIntegerField()` – большое целое число (от -9223372036854775808 до 9223372036854775807).
+- `FloatField()` – число с плавающей точкой.
+- `DecimalField(max_digits=10, decimal_places=2)` – десятичное число с точной арифметикой.
+
+#### 2. Поля для дат и времени
+
+- `DateField(auto_now_add=True)` – поле даты без времени.
+- `TimeField(auto_now=True)` – поле времени без даты.
+
+#### 3. Логические и булевые поля
+
+- `NullBooleanField()` (устарело, вместо него `BooleanField(null=True)`)
+
+#### 4. Поля для связи между моделями
+
+- `ForeignKey(Model, on_delete=models.CASCADE)` – связь "один ко многим".
+- `OneToOneField(Model, on_delete=models.CASCADE)` – связь "один к одному".
+- `ManyToManyField(Model)` – связь "многие ко многим".
+
+#### 5. Поля для файлов и изображений
+
+- `FileField(upload_to='uploads/')` – поле для загрузки файлов.
+- `ImageField(upload_to='images/')` – поле для загрузки изображений.
+
+#### 6. JSON-поле
+
+- `JSONField()` – поле для хранения JSON-данных.
+
+#### 7. Уникальные и специальные поля
+
+- `SlugField(unique=True)` – поле для ЧПУ URL (например, post-title).
+- `UUIDField(default=uuid.uuid4, unique=True)` – поле для уникального идентификатора.
+- `EmailField()` – поле для хранения email-адреса.
+- `URLField()` – поле для хранения URL.
+
+### Какой тип выбрать?
+
+- **Если нужно хранить короткий текст** – `CharField(max_length=...)`.
+- **Если длинный текст** – `TextField()`.
+- **Если дата/время** – `DateTimeField()`, `DateField()`, `TimeField()`.
+- **Если булевый флаг** – `BooleanField()`.
+- **Если число** – `IntegerField()`, `FloatField()`, `DecimalField()`.
+- **Если изображение** – `ImageField()`.
+- **Если отношения между моделями** – `ForeignKey`, `OneToOneField`, `ManyToManyField()`.
+
+**Полный список полей можно найти в документации**
