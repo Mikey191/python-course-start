@@ -1907,3 +1907,119 @@ Women.objects.get(pk=2)
 ```python
 Women.objects.get(pk__gte=2)  # Ошибка, если записей несколько
 ```
+
+## 3.5 Сортировка, изменение и удаление записей в Django ORM
+
+### Сортировка записей
+
+Метод `order_by()` используется для сортировки записей по указанному полю:
+
+```python
+Women.objects.all().order_by('title')
+```
+
+Можно записать этот же запрос так:
+
+```python
+Women.objects.order_by('title')
+```
+
+Этот запрос создаст SQL-запрос с ключевым словом `ORDER BY`, выполняя сортировку по возрастанию (ASC).
+
+### Сортировка с фильтрацией
+
+Можно комбинировать `order_by()` с `filter()`:
+
+```python
+Women.objects.filter(pk__lte=4).order_by('title')
+```
+
+Этот запрос сначала отбирает записи, у которых `id` меньше или равен 4, а затем сортирует их по `title`.
+
+### Сортировка по убыванию
+
+Чтобы отсортировать записи по убыванию, добавляем `-` перед названием поля:
+
+```python
+Women.objects.order_by('-time_update')
+```
+
+### Задание сортировки по умолчанию (Meta)
+
+В модели можно задать сортировку по умолчанию через класс `Meta`:
+
+```python
+class Women(models.Model):
+    ...
+    class Meta:
+        ordering = ['-time_create']
+        indexes = [
+            models.Index(fields=['-time_create']),
+        ]
+
+    def __str__(self):
+        return self.title
+```
+
+Теперь запрос `Women.objects.all()` автоматически вернёт записи в порядке убывания `time_create`.
+
+### Изменение записей
+
+Чтобы изменить запись, сначала получаем объект, затем меняем его поля и сохраняем:
+
+```python
+wu = Women.objects.get(pk=2)
+wu.title = 'Марго Робби'
+wu.content = 'Биография Марго Робби'
+wu.save()
+```
+
+SQL-запрос, выполняемый в базе данных:
+
+```sql
+UPDATE "women_women" SET "title" = 'Марго Робби', "content" = 'Биография Марго Робби' WHERE "id" = 2;
+```
+
+### Массовое обновление записей
+
+Если нужно обновить сразу несколько записей, используем `update()`:
+
+```python
+Women.objects.update(is_published=0)
+```
+
+Этот запрос изменит значение `is_published` для всех записей.
+
+### Изменение записей с фильтрацией
+
+```python
+Women.objects.filter(pk__lte=4).update(is_published=1)
+```
+
+> **Важно:** Метод `update()` нельзя применять к срезам `QuerySet`, например `Women.objects.all()[:4].update(is_published=1)`, это вызовет ошибку.
+
+Также `update()` нельзя применять к одиночному объекту:
+
+```python
+Women.objects.get(pk=5).update(is_published=1)  # Ошибка!
+```
+
+### Удаление записей
+
+Удаление записей выполняется в два шага:
+
+1. Выбираем записи с `filter()`:
+
+```python
+wd = Women.objects.filter(pk__gte=5)
+```
+
+2. Удаляем записи:
+
+```python
+wd.delete()
+```
+
+Этот запрос удалит все записи, у которых `id` больше или равен 5.
+
+> **Важно:** Метод `delete()` нельзя вызывать у одиночных объектов `get()`, только у `QuerySet`.
