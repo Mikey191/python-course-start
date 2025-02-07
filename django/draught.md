@@ -2023,3 +2023,99 @@ wd.delete()
 Этот запрос удалит все записи, у которых `id` больше или равен 5.
 
 > **Важно:** Метод `delete()` нельзя вызывать у одиночных объектов `get()`, только у `QuerySet`.
+
+## 3.6 Слаги (slug) в URL-адресах. Метод get_absolute_url()
+
+Slug – это уникальный фрагмент URL-адреса, связанный с конкретной записью.
+
+```
+https://example.com/post/osnovnye-metody-strok
+```
+
+Здесь slug – это "osnovnye-metody-strok", который определяет статью в БД.
+
+### Добавление Slug в модель
+
+Добавим поле `slug` в модель `Women`.
+
+```python
+class Women(models.Model):
+    title = models.CharField(max_length=255, verbose_name="Заголовок")
+    slug = models.SlugField(max_length=255, db_index=True, blank=True, default='')
+```
+
+Выполняем команды:
+
+```sh
+python manage.py makemigrations
+python manage.py migrate
+```
+
+Заполним slug для существующих записей:
+
+```python
+python manage.py shell_plus
+
+for w in Women.objects.all():
+    w.slug = 'slug-'+str(w.pk)
+    w.save()
+```
+
+После выполнения приводим поле `slug` в модели в окончательный вид:
+
+```python
+slug = models.SlugField(max_length=255, db_index=True, unique=True)
+```
+
+Выполняем команды:
+
+```sh
+python manage.py makemigrations
+python manage.py migrate
+```
+
+### Доступ к статьям по Slug
+
+Обновим `women/urls.py`, чтобы статьи загружались по slug:
+
+```python
+path('post/<slug:post_slug>/', views.show_post, name='post'),
+```
+
+Обновим функцию `show_post` в `views.py`:
+
+```python
+def show_post(request, post_slug):
+    post = get_object_or_404(Women, slug=post_slug)
+    return render(request, 'women/post.html', {'post': post})
+```
+
+Теперь статьи доступны по URL, например:
+
+```
+http://127.0.0.1:8000/post/slug-1/
+```
+
+### Метод get_absolute_url()
+
+Для формирования ссылок со slug в модели добавим метод `get_absolute_url`:
+
+```python
+from django.urls import reverse
+
+class Women(models.Model):
+    ...
+    def get_absolute_url(self):
+        return reverse('post', kwargs={'post_slug': self.slug})
+```
+
+Теперь в шаблоне `index.html` ссылки можно формировать так:
+
+```html
+<p class="link-read-post"><a href="{{ p.get_absolute_url }}">Читать пост</a></p>
+```
+
+**Зачем нужен get_absolute_url()?**
+
+- Позволяет централизованно управлять изменениями URL в одном месте.
+- Используется Django для построения ссылок, например, в админке.
