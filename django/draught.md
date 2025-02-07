@@ -2119,3 +2119,101 @@ class Women(models.Model):
 
 - Позволяет централизованно управлять изменениями URL в одном месте.
 - Используется Django для построения ссылок, например, в админке.
+
+## 3.7 Создание пользовательского менеджера модели
+
+### Реализация собственного менеджера
+
+В файл `models.py` приложения `women` и объявим новый класс менеджера. В классе создаём метод `get_queryset()`, который переопределяет стандартный метод базового класса `models.Manager`, добавляя фильтрацию записей по полю `is_published`:
+
+```python
+from django.db import models
+
+class PublishedModel(models.Manager):
+    def get_queryset(self):
+        return super().get_queryset().filter(is_published=1)
+```
+
+### Использование менеджера в модели
+
+В классе `Women` создадим объект нового менеджера. Важно учитывать, что если в модели объявлен хотя бы один пользовательский менеджер, стандартный `objects` перестаёт существовать, поэтому его нужно прописывать явно.
+
+```python
+class Women(models.Model):
+    ...
+    objects = models.Manager()
+    published = PublishedModel()
+
+    def get_absolute_url(self):
+        return reverse('post', kwargs={'post_slug': self.slug})
+```
+
+### Использование нового менеджера в представлениях
+
+Изменения в функции `index()`:
+
+```python
+def index(request):
+    posts = Women.published.all()
+    data = {
+        'title': 'Главная страница',
+        'menu': menu,
+        'posts': posts,
+    }
+    return render(request, 'women/index.html', context=data)
+```
+
+Аналогично используем его в `show_category()`:
+
+```python
+def show_category(request, cat_id):
+    data = {
+        'title': 'Отображение по рубрикам',
+        'menu': menu,
+        'posts': Women.published.all(),
+        'cat_selected': cat_id,
+    }
+    return render(request, 'women/index.html', context=data)
+```
+
+Убираем условие проверки в `index.html`:
+
+```django
+{% for p in posts %}
+    <li><h2>{{p.title}}</h2>
+{% autoescape off %}
+{{p.content|linebreaks|truncatewords:40}}
+{% endautoescape %}
+    <div class="clear"></div>
+    <p class="link-read-post"><a href="{{ p.get_absolute_url }}">Читать пост</a></p>
+    </li>
+{% endfor %}
+```
+
+### Перечисляемое поле (Enum в Django)
+
+Для создания перечисления используем Django `IntegerChoices`:
+
+```python
+class Women(models.Model):
+    class Status(models.IntegerChoices):
+        DRAFT = 0, 'Черновик'
+        PUBLISHED = 1, 'Опубликовано'
+
+    is_published = models.IntegerField(choices=Status.choices, default=Status.DRAFT)
+```
+
+### Обновление менеджера с использованием `Status`
+
+```python
+class PublishedModel(models.Manager):
+    def get_queryset(self):
+        return super().get_queryset().filter(is_published=Women.Status.PUBLISHED)
+```
+
+### Создание миграции
+
+```sh
+python manage.py makemigrations
+python manage.py migrate
+```
