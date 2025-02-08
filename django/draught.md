@@ -2217,3 +2217,108 @@ class PublishedModel(models.Manager):
 python manage.py makemigrations
 python manage.py migrate
 ```
+
+# 4. Связи между таблицами
+
+## 4.1 Типы связей между моделями в Django: ForeignKey, ManyToManyField, OneToOneField
+
+### Зачем нужны связи между таблицами?
+
+Допустим, у нас есть модель статей, и для каждой статьи нужно хранить категорию, к которой она относится. Если бы мы хранили всю информацию в одной таблице, то пришлось бы дублировать название категории в каждой строке. Это привело бы к следующим проблемам:
+
+- Сложность редактирования (если мы захотим изменить название категории, придется менять каждую запись).
+- Затруднение поиска (фильтрация по текстовым полям выполняется медленнее, чем по числовым идентификаторам).
+- Избыточность данных (повторяющаяся информация занимает больше места в базе данных).
+
+Чтобы избежать этих проблем, данные разделяют на несколько таблиц, связывая их между собой. Такой подход называется **нормализацией** и позволяет:
+
+- Уменьшить дублирование данных.
+- Облегчить редактирование информации.
+- Ускорить выполнение запросов.
+
+### Типы связей между моделями в Django
+
+1. **ForeignKey** – связь «многие к одному» (Many to One).
+2. **ManyToManyField** – связь «многие ко многим» (Many to Many).
+3. **OneToOneField** – связь «один к одному» (One to One).
+
+### ForeignKey (многие к одному)
+
+Этот тип связи используется, когда одна запись в одной таблице может быть связана с несколькими записями в другой таблице.
+
+Создадим две модели: `Category` и `Article`, где `Article` содержит внешний ключ (`ForeignKey`) на `Category`.
+
+```python
+from django.db import models
+
+class Category(models.Model):
+    name = models.CharField(max_length=100)
+    slug = models.SlugField(unique=True)
+
+    def __str__(self):
+        return self.name
+
+class Article(models.Model):
+    title = models.CharField(max_length=200)
+    content = models.TextField()
+    category = models.ForeignKey(Category, on_delete=models.CASCADE)
+
+    def __str__(self):
+        return self.title
+```
+
+- **Category** содержит поля `name` (название категории) и `slug` (уникальный идентификатор).
+- **Article** имеет поле `category`, которое является внешним ключом (`ForeignKey`). Оно указывает, к какой категории принадлежит статья.
+- `on_delete=models.CASCADE` означает, что если категория будет удалена, все связанные статьи тоже удалятся.
+
+### ManyToManyField (многие ко многим)
+
+Этот тип связи используется, когда одна запись может быть связана с несколькими записями из другой таблицы и наоборот.
+
+```python
+class Teacher(models.Model):
+    name = models.CharField(max_length=100)
+
+    def __str__(self):
+        return self.name
+
+class Student(models.Model):
+    name = models.CharField(max_length=100)
+    teachers = models.ManyToManyField(Teacher)
+
+    def __str__(self):
+        return self.name
+```
+
+- **Student** и **Teacher** связаны через `ManyToManyField`, что создаст промежуточную таблицу.
+- Django автоматически создаст связь между студентами и преподавателями без необходимости вручную создавать таблицу связей.
+- В базе данных создастся промежуточная таблица (`student_teachers`), содержащая два поля: `student_id` и `teacher_id`.
+
+### OneToOneField (один к одному)
+
+Этот тип связи используется, когда одна запись в одной таблице может быть связана только с одной записью в другой таблице.
+
+```python
+class Citizen(models.Model):
+    name = models.CharField(max_length=100)
+
+    def __str__(self):
+        return self.name
+
+class Passport(models.Model):
+    citizen = models.OneToOneField(Citizen, on_delete=models.CASCADE)
+    passport_number = models.CharField(max_length=50, unique=True)
+
+    def __str__(self):
+        return f"{self.citizen.name} - {self.passport_number}"
+```
+
+- **Citizen** – основная таблица.
+- **Passport** содержит `OneToOneField`, что означает, что у каждого гражданина может быть только один паспорт.
+- `on_delete=models.CASCADE` гарантирует, что если гражданин удаляется, его паспорт также удаляется.
+
+### Схема связей между моделями
+
+- **ForeignKey** (многие к одному): `Article` → `Category` (одна категория может иметь несколько статей).
+- **ManyToManyField** (многие ко многим): `Student` ↔ `Teacher` (многие студенты могут иметь много преподавателей).
+- **OneToOneField** (один к одному): `Citizen` → `Passport` (у каждого гражданина есть только один паспорт).
