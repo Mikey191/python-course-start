@@ -2544,3 +2544,106 @@ c.delete()
   ```python
   Category.objects.filter(posts__title__contains='ли').distinct()
   ```
+
+## 4.4 Отображение постов по рубрикам в Django
+
+### Изменение маршрута в `urls.py`
+
+Поменяем маршрут в `women/urls.py`, чтобы вместо числового идентификатора (int) использовать slug и в URL будет использоваться slug вместо id, что делает ссылки более читаемыми и SEO-дружественными:
+
+```python
+from django.urls import path
+from . import views
+
+urlpatterns = [
+    path('category/<slug:cat_slug>/', views.show_category, name='category'),
+]
+```
+
+### Обновление представления `show_category` в `views.py`
+
+Перейдём в `women/views.py` и изменим функцию `show_category()`:
+
+```python
+from django.shortcuts import render, get_object_or_404
+from .models import Women, Category
+
+
+def show_category(request, cat_slug):
+    category = get_object_or_404(Category, slug=cat_slug)
+    posts = Women.published.filter(cat_id=category.pk)
+    data = {
+        'title': f'Рубрика: {category.name}',
+        'menu': menu,
+        'posts': posts,
+        'cat_selected': category.pk,
+    }
+    return render(request, 'women/index.html', context=data)
+```
+
+Здесь мы:
+
+- Получаем объект `Category` по его `slug`, выбрасывая ошибку 404, если он не найден.
+- Извлекаем все статьи, относящиеся к данной категории.
+- Формируем словарь `data` для передачи в шаблон.
+- Передаём данные в `index.html`.
+
+### Изменение пользовательского шаблонного тега
+
+Рубрики выводятся с помощью пользовательского тега `show_categories()`, определённого в `women_tags.py`. Заменим получение рубрик из статической коллекции `cats_db` на чтение из таблицы `Category`:
+
+```python
+from django import template
+from women.models import Category
+
+register = template.Library()
+
+@register.inclusion_tag('women/list_categories.html')
+def show_categories(cat_selected_id=0):
+    cats = Category.objects.all()
+    return {"cats": cats, "cat_selected": cat_selected_id}
+```
+
+### Обновление шаблона `list_categories.html`
+
+Изменим код в `list_categories.html` для правильного отображения рубрик:
+
+```html
+{% for cat in cats %} {% if cat.id == cat_selected %}
+<li class="selected">{{ cat.name }}</li>
+{% else %}
+<li><a href="{{ cat.get_absolute_url }}">{{ cat.name }}</a></li>
+{% endif %} {% endfor %}
+```
+
+### Добавление метода `get_absolute_url()` в модель Category
+
+Чтобы ссылки генерировались автоматически, добавим в модель `Category` метод `get_absolute_url()`:
+
+```python
+from django.urls import reverse
+from django.db import models
+
+class Category(models.Model):
+    name = models.CharField(max_length=100, db_index=True)
+    slug = models.SlugField(max_length=255, unique=True, db_index=True)
+
+    def get_absolute_url(self):
+        return reverse('category', kwargs={'cat_slug': self.slug})
+
+    def __str__(self):
+        return self.name
+```
+
+### Обновление шаблона `index.html`
+
+Добавим в шаблон `index.html` перед заголовком статьи блок с названием категории и временем её последнего обновления:
+
+```html
+<li>
+  <div class="article-panel">
+    <p class="first">Категория: {{ p.cat.name }}</p>
+    <p class="last">Дата: {{ p.time_update|date:"d-m-Y H:i:s" }}</p>
+  </div>
+</li>
+```
