@@ -2322,3 +2322,120 @@ class Passport(models.Model):
 - **ForeignKey** (многие к одному): `Article` → `Category` (одна категория может иметь несколько статей).
 - **ManyToManyField** (многие ко многим): `Student` ↔ `Teacher` (многие студенты могут иметь много преподавателей).
 - **OneToOneField** (один к одному): `Citizen` → `Passport` (у каждого гражданина есть только один паспорт).
+
+## 4.2 Связь Many-to-One (многие к одному) с ForeignKey в Django
+
+Связь "многие к одному" (Many-to-One) используется в реляционных базах данных для создания отношений между таблицами, где множество записей в одной таблице могут ссылаться на одну запись в другой.
+
+В Django ORM это реализуется с помощью поля `ForeignKey`.
+
+### Определение ForeignKey
+
+Поле `ForeignKey` требует два обязательных параметра:
+
+- **`to`** – модель, с которой связывается поле (можно указать как строку, если модель определена ниже по коду);
+- **`on_delete`** – определяет, что происходит при удалении записи в первичной модели.
+
+```python
+from django.db import models
+
+class Category(models.Model):
+    name = models.CharField(max_length=100, db_index=True)
+    slug = models.SlugField(max_length=255, unique=True, db_index=True)
+
+    def __str__(self):
+        return self.name
+
+class Women(models.Model):
+    name = models.CharField(max_length=100)
+    cat = models.ForeignKey('Category', on_delete=models.PROTECT)
+```
+
+### Опции on_delete
+
+```bash
++---------------------------------------------------------------------+
+| Значение       | Описание                                           |
+|----------------|----------------------------------------------------|
+| `CASCADE`      | Удаляет все связанные записи.                      |
+| `PROTECT`      | Запрещает удаление, если есть связанные записи.    |
+| `SET_NULL`     | Присваивает `NULL` связанным записям.              |
+| `SET_DEFAULT`  | Устанавливает значение по умолчанию.               |
+| `SET(<value>)` | Устанавливает определенное пользователем значение. |
+| `DO_NOTHING`   | Никаких действий не выполняется.                   |
++---------------------------------------------------------------------+
+```
+
+### Создание и применение миграций
+
+После добавления нового поля `cat` необходимо выполнить миграции:
+
+```sh
+python manage.py makemigrations
+```
+
+Возможна ошибка, если в таблице `Women` уже есть записи, так как поле `cat` не может быть пустым. Решение:
+
+```python
+cat = models.ForeignKey('Category', on_delete=models.PROTECT, null=True)
+```
+
+После этого:
+
+```sh
+python manage.py makemigrations
+python manage.py migrate
+```
+
+Теперь таблицы `women_category` и `women_women` в базе данных содержат связь `cat_id`.
+
+Заполняем категории:
+
+```sh
+python manage.py shell_plus
+```
+
+```python
+Category.objects.create(name='Актрисы', slug='aktrisy')
+Category.objects.create(name='Певицы', slug='pevicy')
+```
+
+Обновляем поле `cat_id` для всех записей:
+
+```python
+w_list = Women.objects.all()
+w_list.update(cat_id=1)
+```
+
+Затем удаляем `null=True` и выполняем миграцию:
+
+```sh
+python manage.py makemigrations
+python manage.py migrate
+```
+
+### Проверка работы параметра on_delete
+
+#### `PROTECT`
+
+```python
+c = Category.objects.get(pk=1)
+c.delete()  # Ошибка ProtectedError
+```
+
+Категорию удалить нельзя, пока есть связанные женщины.
+
+#### `CASCADE`
+
+Меняем `on_delete`:
+
+```python
+cat = models.ForeignKey('Category', on_delete=models.CASCADE)
+```
+
+Теперь удаление категории удалит всех женщин, связанных с ней:
+
+```python
+c = Category.objects.get(pk=1)
+c.delete()
+```
