@@ -2439,3 +2439,108 @@ cat = models.ForeignKey('Category', on_delete=models.CASCADE)
 c = Category.objects.get(pk=1)
 c.delete()
 ```
+
+## 4.3 ORM-команды для связи many-to-one
+
+### Работа с ORM через shell
+
+- Читаем запись с `id=1` из таблицы `Women`:
+
+  ```python
+  w = Women.objects.get(pk=1)
+  ```
+
+- Теперь объект `w` содержит данные из таблицы `Women`:
+
+  ```python
+  w.title  # 'Анджелина Джоли'
+  w.time_create  # datetime.datetime(2023, 6, 15)
+  ```
+
+- Атрибут `cat_id` показывает ID связанной категории:
+
+  ```python
+  w.cat_id  # 1
+  ```
+
+- Обращение к `w.cat` выполняет дополнительный SQL-запрос и возвращает объект `Category`:
+
+  ```python
+  w.cat.name  # 'Актрисы'
+  ```
+
+### Получение связанных записей через первичную модель
+
+- Можно извлекать все записи из `Women`, относящиеся к категории `Category`:
+
+  ```python
+  c = Category.objects.get(pk=1)
+  c.women_set.all()
+  ```
+
+- Чтобы изменить `women_set`, задаем параметр `related_name` в `ForeignKey`:
+
+  ```python
+  class Women(models.Model):
+      cat = models.ForeignKey(Category, on_delete=models.CASCADE, related_name='posts')
+  ```
+
+- Теперь доступ к связанным записям осуществляется так:
+
+  ```python
+  c.posts.all()
+  ```
+
+- Можно применять фильтры:
+
+  ```python
+  c.posts.filter(is_published=1)
+  ```
+
+### Фильтрация по внешнему ключу
+
+- Выбираем записи по категории:
+
+  ```python
+  Women.objects.filter(cat_id=1)
+  ```
+
+- Фильтр `in` для нескольких категорий:
+
+  ```python
+  Women.objects.filter(cat__in=[1, 2])
+  Women.objects.filter(cat_id__in=[1, 2])
+  ```
+
+- Или передаем объекты:
+
+  ```python
+  cats = Category.objects.all()
+  Women.objects.filter(cat__in=cats)
+  ```
+
+### Выборка записей по полям связанных моделей
+
+- Фильтрация по `slug`:
+
+  ```python
+  Women.objects.filter(cat__slug='aktrisy')
+  ```
+
+- Фильтрация по `name`:
+
+  ```python
+  Women.objects.filter(cat__name='Певицы')
+  ```
+
+- Фильтрация с `contains`:
+
+  ```python
+  Women.objects.filter(cat__name__contains='ы')
+  ```
+
+- Фильтрация категорий по заголовкам связанных записей:
+
+  ```python
+  Category.objects.filter(posts__title__contains='ли').distinct()
+  ```
