@@ -2647,3 +2647,122 @@ class Category(models.Model):
   </div>
 </li>
 ```
+
+## 4.5 Связь Many-to-Many (многие ко многим) в Django
+
+Связь "многие ко многим" (Many-to-Many) широко применяется в базах данных и позволяет устанавливать ассоциации между множеством записей одной таблицы и множеством записей другой таблицы. В Django это реализуется с помощью поля `ManyToManyField`.
+
+### Реализация Many-to-Many
+
+- **Определение модели тегов**: В файле `women/models.py` создадим новую модель `TagPost` для хранения тегов.
+
+  ```python
+  from django.db import models
+
+  class TagPost(models.Model):
+      tag = models.CharField(max_length=100, db_index=True)
+      slug = models.SlugField(max_length=255, unique=True, db_index=True)
+
+      def __str__(self):
+          return self.tag
+  ```
+
+- **Добавление связи Many-to-Many**: В модели `Women` добавим новое поле `tags`.
+
+  ```python
+  class Women(models.Model):
+      title = models.CharField(max_length=255)
+      slug = models.SlugField(max_length=255, unique=True)
+      tags = models.ManyToManyField('TagPost', blank=True, related_name='tags')
+  ```
+
+  Важно:
+
+  - Мы передаем `'TagPost'` в виде строки, потому что модель `TagPost` объявлена позже.
+  - `on_delete` не используется для `ManyToManyField`.
+
+- Создание и применение миграций:
+
+  ```bash
+  python manage.py makemigrations
+  python manage.py migrate
+  ```
+
+  После этого в базе данных появятся две таблицы:
+
+  - `women_tagpost` – хранит теги.
+  - `women_women_tags` – вспомогательная таблица, связывающая статьи и теги.
+
+### Добавление тегов в базу через ORM Django
+
+Открываем Django Shell:
+
+```bash
+python manage.py shell_plus
+```
+
+Создаем теги:
+
+```python
+TagPost.objects.create(tag='Блондинки', slug='blonde')
+TagPost.objects.create(tag='Брюнетки', slug='brunetky')
+TagPost.objects.create(tag='Оскар', slug='oskar')
+```
+
+### Присвоение тегов статьям через ORM Django
+
+Получаем статью с `id=1`:
+
+```python
+a = Women.objects.get(pk=1)
+```
+
+Получаем нужные теги:
+
+```python
+tag_br = TagPost.objects.get(slug='brunetky')
+tag_o = TagPost.objects.get(slug='oskar')
+tag_v = TagPost.objects.get(slug='visokie')
+```
+
+Добавляем теги статье:
+
+```python
+a.tags.set([tag_br, tag_o, tag_v])
+```
+
+### Удаление тегов через ORM Django
+
+```python
+a.tags.remove(tag_o)
+```
+
+### Получение связанных данных через ORM Django
+
+Получаем все теги статьи:
+
+```python
+a.tags.all()
+```
+
+Получаем все статьи, связанные с тегом `Брюнетки`:
+
+```python
+tag_br.tags.all()
+```
+
+### Добавление статьи с тегами через ORM Django
+
+Нельзя создать новую статью и сразу передать ей теги:
+
+```python
+# Ошибка!
+Women.objects.create(title='Ариана Гранде', slug='ariana-grande', tags=[tag_br, tag_v])
+```
+
+Правильный способ:
+
+```python
+w = Women.objects.create(title='Ариана Гранде', slug='ariana-grande')
+w.tags.set([tag_br, tag_v])
+```
