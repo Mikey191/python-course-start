@@ -2766,3 +2766,140 @@ Women.objects.create(title='Ариана Гранде', slug='ariana-grande', ta
 w = Women.objects.create(title='Ариана Гранде', slug='ariana-grande')
 w.tags.set([tag_br, tag_v])
 ```
+
+## 4.6 Добавление тегов на сайт
+
+### Создание маршрута для тегов
+
+Добавим новый маршрут для отображения списка статей по выбранному тегу. Откроем файл `women/urls.py` и внесем в `urlpatterns` следующую строку:
+
+```python
+urlpatterns = [
+    ...
+    path('tag/<slug:tag_slug>/', views.show_tag_postlist, name='tag'),
+]
+```
+
+### Добавление метода `get_absolute_url` в модель TagPost
+
+В файле `women/models.py` создадим модель `TagPost`, если ее еще нет, и добавим метод `get_absolute_url()` для формирования URL-адреса:
+
+```python
+from django.db import models
+from django.urls import reverse
+
+class TagPost(models.Model):
+    tag = models.CharField(max_length=100, db_index=True)
+    slug = models.SlugField(max_length=255, unique=True, db_index=True)
+
+    def get_absolute_url(self):
+        return reverse('tag', kwargs={'tag_slug': self.slug})
+
+    def __str__(self):
+        return self.tag
+```
+
+### Создание представления для отображения статей по тегу
+
+В файле `women/views.py` объявим функцию `show_tag_postlist`, которая будет обрабатывать запросы к тегу и выводить список статей, связанных с ним:
+
+```python
+from django.shortcuts import render, get_object_or_404
+from .models import Women, TagPost
+
+
+def show_tag_postlist(request, tag_slug):
+    tag = get_object_or_404(TagPost, slug=tag_slug)
+    posts = tag.tags.filter(is_published=Women.Status.PUBLISHED)
+    data = {
+        'title': f'Тег: {tag.tag}',
+        'menu': menu,
+        'posts': posts,
+        'cat_selected': None,
+    }
+
+    return render(request, 'women/index.html', context=data)
+```
+
+### Добавление параметра `cat_selected` в index
+
+Чтобы правильно обрабатывать выбор тегов, изменим функцию `index()`:
+
+```python
+def index(request):
+    data = {
+        'title': 'Главная страница',
+        'menu': menu,
+        'posts': Women.published.all(),
+        'cat_selected': 0,
+    }
+
+    return render(request, 'women/index.html', context=data)
+```
+
+### Создание шаблонного тега для отображения списка тегов в сайдбаре
+
+Создадим файл `women/women_tags.py` (если его нет) и зарегистрируем новый шаблонный тег:
+
+```python
+from django import template
+from women.models import TagPost
+
+register = template.Library()
+
+@register.inclusion_tag('women/list_tags.html')
+def show_all_tags():
+    return {"tags": TagPost.objects.all()}
+```
+
+### Создание шаблона `list_tags.html`
+
+В файле `women/templates/women/list_tags.html` добавим следующий код:
+
+```html
+{% if tags %}
+<p>Теги:</p>
+<ul class="tags-list">
+  {% for t in tags %}
+  <li><a href="{{t.get_absolute_url}}">{{t.tag}}</a></li>
+  {% endfor %}
+</ul>
+{% endif %}
+```
+
+### Подключение списка тегов в базовый шаблон
+
+Теперь добавим вызов нашего шаблонного тега в `base.html`:
+
+```html
+<li>{% show_all_tags %}</li>
+```
+
+После этого при загрузке страницы в сайдбаре должен появиться список тегов.
+
+### Добавление списка тегов в шаблон статьи
+
+В шаблоне `women/post.html` добавим отображение тегов, привязанных к конкретной статье:
+
+```html
+{% extends 'base.html' %} {% block breadcrumbs %}
+<!-- Теги -->
+{% with post.tags.all as tags %} {% if tags %}
+<ul class="tags-list">
+  <li>Теги:</li>
+  {% for t in tags %}
+  <li><a href="{{t.get_absolute_url}}">{{t.tag}}</a></li>
+  {% endfor %}
+</ul>
+{% endif %} {% endwith %} {% endblock %}
+```
+
+### Схема взаимодействия файлов
+
+1. **`women/urls.py`** — добавляет маршрут для тегов.
+2. **`women/models.py`** — содержит модель `TagPost` с методом `get_absolute_url()`.
+3. **`women/views.py`** — содержит представление `show_tag_postlist`, обрабатывающее теги.
+4. **`women/women_tags.py`** — содержит шаблонный тег `show_all_tags()`.
+5. **`women/templates/women/list_tags.html`** — выводит список тегов.
+6. **`women/templates/base.html`** — содержит вызов `{% show_all_tags %}`.
+7. **`women/templates/women/post.html`** — отображает теги статьи.
