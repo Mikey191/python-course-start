@@ -2903,3 +2903,141 @@ def show_all_tags():
 5. **`women/templates/women/list_tags.html`** — выводит список тегов.
 6. **`women/templates/base.html`** — содержит вызов `{% show_all_tags %}`.
 7. **`women/templates/women/post.html`** — отображает теги статьи.
+
+## 4.7 Связь One-To-One (Один к одному)
+
+Связь One-To-One (один к одному) в реляционных базах данных подразумевает, что одна запись в одной таблице может соответствовать только одной записи в другой таблице.
+
+### Определение моделей
+
+Для демонстрации связи `One-To-One` создадим новую модель `Husband`, которая будет хранить информацию о муже:
+
+```python
+from django.db import models
+
+class Husband(models.Model):
+    name = models.CharField(max_length=100)
+    age = models.IntegerField(null=True)
+
+    def __str__(self):
+        return self.name
+```
+
+### Добавим связь `One-To-One` в модель `Women`:
+
+```python
+class Women(models.Model):
+    ...
+    husband = models.OneToOneField('Husband', on_delete=models.SET_NULL, null=True, blank=True, related_name='woman')
+    ...
+```
+
+Здесь мы:
+
+- Используем `OneToOneField` для связи с моделью `Husband`.
+- Указываем `on_delete=models.SET_NULL`, чтобы при удалении мужа поле становилось `NULL`.
+- Добавляем `related_name='woman'`, чтобы можно было обращаться к объекту `Women` через `Husband`.
+
+После добавления моделей необходимо создать миграции и применить их:
+
+```sh
+python manage.py makemigrations
+python manage.py migrate
+```
+
+### Работа с данными
+
+- Создадим несколько записей в модели `Husband` через Django shell:
+
+  ```python
+  h1 = Husband.objects.create(name="Брэд Питт", age=59)
+  h2 = Husband.objects.create(name="Том Акерли", age=31)
+  h3 = Husband.objects.create(name="Дэниэл Модер")
+  h4 = Husband.objects.create(name="Кук Марони")
+  ```
+
+- Распределим мужей по женщинам. Например, получим объект `Women` с `pk=1`:
+
+```python
+w1 = Women.objects.get(pk=1)
+print(w1.husband)  # Выведет None
+```
+
+- Назначим `h1` (Брэда Питта) в качестве мужа `w1`:
+
+```python
+w1.husband = h1
+w1.save()
+```
+
+- Теперь можно проверить:
+
+```python
+print(w1.husband)  # Брэд Питт
+print(h1.woman)  # Женщина, связанная с Брэдом Питтом
+```
+
+- Можно установить связь с другой стороны:
+
+  ```python
+  w2 = Women.objects.get(pk=2)
+  h2.woman = w2
+  w2.save()
+  ```
+
+  Важно! Мы сохраняем `w2`, так как `husband_id` находится именно в таблице `Women`.
+
+- Попробуем назначить `h2` (Тома Акерли) другой женщине:
+
+  ```python
+  w3 = Women.objects.get(pk=3)
+  w3.husband = h2
+  w3.save()
+  ```
+
+  Получим ошибку:
+
+  ```plaintext
+  IntegrityError: UNIQUE constraint failed: women_women.husband_id
+  ```
+
+- Чтобы назначить `h2` новой женщине `w3`, сначала нужно убрать его у `w2`:
+
+  ```python
+  w2.husband = None
+  w2.save()
+
+  w3.husband = h2
+  w3.save()
+  ```
+
+  Теперь `h2` связан с `w3`.
+
+- Через объект `Women` можно получить данные мужа:
+
+  ```python
+  print(w1.husband.name)  # Брэд Питт
+  print(w1.husband.age)  # 59
+  ```
+
+  Можно менять данные напрямую через объект `husband`:
+
+  ```python
+  w1.husband.age = 30
+  w1.husband.save()
+  ```
+
+  Теперь `Брэд Питт` имеет возраст `30` лет.
+
+### Структура файлов и зависимостей
+
+#### Основные файлы:
+
+- `models.py` – содержит модели `Women` и `Husband`.
+- `migrations/` – папка с миграциями.
+- `manage.py` – используется для работы с Django.
+
+#### Взаимосвязи:
+
+- `Women.husband` → `Husband`
+- `Husband.woman` ← `Women`
