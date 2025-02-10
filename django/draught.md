@@ -3041,3 +3041,110 @@ print(h1.woman)  # Женщина, связанная с Брэдом Питто
 
 - `Women.husband` → `Husband`
 - `Husband.woman` ← `Women`
+
+# 5. Погружение в ORM Django
+
+## 5.1 ORM-команды с классом Q в Django
+
+При работе с `filter()` в ORM Django мы можем передавать несколько условий через запятую. Однако это всегда формирует логический оператор `AND`:
+
+```python
+Women.objects.filter(pk__in=[2, 5, 7, 10], is_published=True)
+```
+
+Этот код приведет к следующему SQL-запросу:
+
+```sql
+WHERE ("women_women"."is_published" AND "women_women"."id" IN (2, 5, 7, 10))
+```
+
+Если нам нужно использовать `OR` или `NOT`, на помощь приходит класс `Q` из `django.db.models`.
+
+### Основные операторы класса `Q`
+
+- `&` — логическое И (приоритет 2)
+- `|` — логическое ИЛИ (приоритет 1 — самый низкий)
+- `~` — логическое НЕ (приоритет 3 — самый высокий)
+
+### Примеры использования
+
+Перед началом работы импортируем `Q`:
+
+```python
+from django.db.models import Q
+```
+
+#### Пример 1: Использование `OR` (`|`)
+
+Если объединить условия с `Q` то в результат попадут записи, у которых `id < 5` **ИЛИ** `cat_id = 2`.
+
+```python
+Women.objects.filter(Q(pk__lt=5) | Q(cat_id=2))
+```
+
+#### Пример 2: Использование `AND` (`&`)
+
+Тот же запрос, но с логическим `AND`:
+
+```python
+Women.objects.filter(Q(pk__lt=5) & Q(cat_id=2))
+```
+
+#### Пример 3: Использование `NOT` (`~`)
+
+Отбираем записи, у которых не `id >= 5` или `cat_id = 2`:
+
+```python
+Women.objects.filter(~Q(pk__lt=5) | Q(cat_id=2))
+```
+
+### Комбинированные запросы
+
+Мы можем комбинировать `Q` с обычными аргументами:
+
+```python
+Women.objects.filter(Q(pk__in=[1, 2, 5]) | Q(cat_id=2), title__icontains="ра")
+```
+
+Этот запрос приведет к SQL-запросу:
+
+```sql
+WHERE (("women_women"."id" IN (1, 2, 5) OR "women_women"."cat_id" = 2) AND "women_women"."title" LIKE '%ра%' ESCAPE '\')
+```
+
+Но такой код вызовет ошибку:
+
+```python
+Women.objects.filter(title__icontains="ра", Q(pk__in=[1, 2, 5]) | Q(cat_id=2))
+```
+
+Потому что `Q`-объекты должны быть указаны перед обычными аргументами или включены в `Q`:
+
+```python
+Women.objects.filter(Q(title__icontains="ра"), Q(pk__in=[1, 2, 5]) | Q(cat_id=2))
+```
+
+Если нам нужно убрать дополнительные скобки вокруг `OR`, используем `Q` так:
+
+```python
+Women.objects.filter(Q(pk__in=[1, 2, 5]) | Q(cat_id=2) & Q(title__icontains="ра"))
+```
+
+### Итоговая схема работы с классом `Q`
+
+1. **Импортируем `Q`**:
+
+   ```python
+   from django.db.models import Q
+   ```
+
+2. **Используем `|`, `&`, `~` для сложных условий**:
+
+   ```python
+   Women.objects.filter(Q(pk__in=[1, 2, 5]) | Q(cat_id=2) & Q(title__icontains="ра"))
+   ```
+
+3. **Сначала пишем `Q`, затем обычные аргументы**:
+   ```python
+   Women.objects.filter(Q(pk__lt=5) | Q(cat_id=2), title__icontains="ра")
+   ```
