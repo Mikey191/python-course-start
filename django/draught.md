@@ -3189,7 +3189,7 @@ Women.objects.latest("time_update")
 Women.objects.order_by('title').earliest("time_update")
 ```
 
-### Методы get*previous_by* и get*next_by*
+### Методы `get_previous_by_` и `get_next_by_`
 
 Для выбора предыдущей или следующей записи относительно текущей используется `get_previous_by_` и `get_next_by_`, где в качестве параметра указывается поле с датой или временем.
 
@@ -3273,3 +3273,112 @@ if Women.objects.filter(cat=c2).exists():
 - `exists()` используется для быстрого определения наличия записей.
 - `count()` позволяет получить количество записей без загрузки данных.
 - Использование этих методов ускоряет выполнение запросов и снижает нагрузку на базу данных.
+
+## 5.3 Класс F, Value и метод annotate() в Django ORM
+
+Класс `F` используется, когда нам нужно использовать значение другого поля.
+
+Использование `F` предотвращает возможные коллизии при одновременном обновлении данных несколькими пользователями.
+
+```python
+from django.db.models import F
+Women.objects.filter(pk__gt=F("cat_id"))
+```
+
+Этот код вернет все записи, где `pk` больше, чем `cat_id`. SQL-запрос будет выглядеть так:
+
+```sql
+SELECT ... FROM "women_women" WHERE "women_women"."id" > "women_women"."cat_id"
+```
+
+### Использование класса F для обновления данных
+
+Модель `Husband`, в которой мы храним количество браков для каждого мужчины:
+
+```python
+class Husband(models.Model):
+    name = models.CharField(max_length=100)
+    age = models.IntegerField(null=True)
+    m_count = models.IntegerField(blank=True, default=0)
+
+    def __str__(self):
+        return self.name
+```
+
+Увеличим значение `m_count` у всех записей:
+
+```python
+Husband.objects.update(m_count=F("m_count") + 1)
+```
+
+SQL-запрос, который сформирует Django ORM:
+
+```sql
+UPDATE "women_husband" SET "m_count" = ("women_husband"."m_count" + 1)
+```
+
+Также можно обновить одно конкретное поле:
+
+```python
+h = Husband.objects.get(pk=1)
+h.m_count = F("m_count") + 1
+h.save()
+```
+
+### Метод annotate()
+
+Метод `annotate()` позволяет формировать дополнительные вычисляемые поля в выборке.
+
+Добавим булево поле `is_married`:
+
+```python
+from django.db.models import Value
+
+lst = Husband.objects.all().annotate(is_married=Value(True))
+```
+
+Поле `is_married` не существует в базе данных, но добавляется в выборку динамически.
+
+### Использование F в annotate()
+
+Вместо константного значения можно использовать `F` для работы с существующими полями:
+
+```python
+lst = Husband.objects.all().annotate(is_married=F("m_count"))
+```
+
+Теперь `is_married` будет содержать те же значения, что и `m_count`.
+
+Можно также выполнить математические вычисления:
+
+```python
+lst = Husband.objects.all().annotate(work_age=F("age") - 20)
+```
+
+Результат:
+
+```
+['id', 'name', 'age', 'm_count', 'work_age']
+[1, 'Брэд Питт', 30, 4, 10]
+[2, 'Том Акерли', 31, 1, 11]
+[3, 'Дэниэл Модер', 54, 0, 34]
+```
+
+Можно создать сразу несколько новых полей:
+
+```python
+lst = Husband.objects.all().annotate(work_age=F("age") - 20, salary=F("age") * 1.10)
+```
+
+Еще один пример, где вычисления выполняются на основе нескольких полей:
+
+```python
+lst = Husband.objects.all().annotate(salary=F("age") * 1.10 - F("m_count") * 5)
+```
+
+### Заключение
+
+- `F` позволяет работать с полями модели в выражениях.
+- `Value` используется для аннотирования выборки статическими значениями.
+- `annotate()` позволяет добавлять вычисляемые поля на основе `F` и `Value`.
+- Использование `F` предотвращает коллизии при обновлении данных.
