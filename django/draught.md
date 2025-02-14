@@ -3880,3 +3880,152 @@ class WomenConfig(AppConfig):
 ```
 
 После этих изменений админ-панель станет удобнее и понятнее.
+
+## 6.2 Настройка отображения списка статей в админ-панели
+
+### Добавление дополнительных полей в список статей
+
+Для удобного просмотра списка статей в административной панели добавим в него дополнительные поля: `id`, `title`, `time_create` и `is_published`.
+
+Для этого в файле `women/admin.py` создадим класс, унаследованный от `ModelAdmin`:
+
+```python
+from django.contrib import admin
+from .models import Women
+
+class WomenAdmin(admin.ModelAdmin):
+    list_display = ('id', 'title', 'time_create', 'is_published')
+    list_display_links = ('id', 'title')
+
+admin.site.register(Women, WomenAdmin)
+```
+
+- **list_display** — определяет список полей, которые будут отображаться в админ-панели.
+- **list_display_links** — указывает, какие поля будут активными ссылками для перехода к редактированию записи.
+
+При этом `WomenAdmin` должен обязательно идти после определения модели `Women`.
+
+### Использование декоратора `@admin.register`
+
+Вместо явного вызова `admin.site.register()` можно использовать декоратор:
+
+```python
+@admin.register(Women)
+class WomenAdmin(admin.ModelAdmin):
+    list_display = ('id', 'title', 'time_create', 'is_published')
+    list_display_links = ('id', 'title')
+```
+
+### Сортировка записей в админке
+
+Для сортировки записей по дате создания и заголовку добавим атрибут `ordering`:
+
+```python
+ordering = ['time_create', 'title']
+```
+
+Если требуется изменить порядок сортировки на убывающий, добавляем `-` перед полем:
+
+```python
+ordering = ['-time_create', 'title']
+```
+
+Такой порядок применяется **только в админ-панели** и не влияет на отображение записей в других частях проекта.
+
+### Локализация названий полей
+
+Чтобы вместо английских названий отображались русские, добавим `verbose_name` в `models.py`:
+
+```python
+class Women(models.Model):
+    class Status(models.IntegerChoices):
+        DRAFT = 0, 'Черновик'
+        PUBLISHED = 1, 'Опубликовано'
+
+    title = models.CharField(max_length=255, verbose_name="Заголовок")
+    content = models.TextField(blank=True, verbose_name="Текст статьи")
+    time_create = models.DateTimeField(auto_now_add=True, verbose_name="Время создания")
+    is_published = models.BooleanField(choices=Status.choices, default=Status.DRAFT, verbose_name="Статус")
+    cat = models.ForeignKey('Category', on_delete=models.PROTECT, related_name='posts', verbose_name="Категория")
+```
+
+### Регистрация модели `Category`
+
+По аналогии зарегистрируем вторую модель `Category` в `admin.py`:
+
+```python
+from .models import Category
+
+@admin.register(Category)
+class CategoryAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name')
+    list_display_links = ('id', 'name')
+```
+
+Добавим локализацию в `models.py`:
+
+```python
+class Category(models.Model):
+    name = models.CharField(max_length=100, db_index=True, verbose_name="Категория")
+
+    class Meta:
+        verbose_name = 'Категория'
+        verbose_name_plural = 'Категории'
+```
+
+### Редактирование полей прямо в списке
+
+Добавим возможность редактирования поля `is_published` прямо в списке статей:
+
+```python
+list_editable = ('is_published', )
+```
+
+После обновления страницы можно изменять статус публикации прямо в списке.
+
+**Важно!** Поля в `list_editable` не могут входить в `list_display_links`, иначе возникнет ошибка.
+
+### Проблема с `choices` в `BooleanField`
+
+Стандартный `BooleanField` не поддерживает `IntegerChoices`, поэтому для корректного отображения статуса исправим его так:
+
+```python
+is_published = models.BooleanField(choices=tuple(map(lambda x: (bool(x[0]), x[1]), Status.choices)),
+                                   default=Status.DRAFT, verbose_name="Статус")
+```
+
+### Отображение связанных полей
+
+Добавим отображение категории:
+
+```python
+list_display = ('title', 'time_create', 'is_published', 'cat')
+```
+
+И возможность редактирования:
+
+```python
+list_editable = ('is_published', 'cat')
+```
+
+Теперь можно менять категорию статей прямо в списке.
+
+### Настройка пагинации
+
+Для удобства просмотра списка статей настроим количество записей на странице:
+
+```python
+list_per_page = 5
+```
+
+### Итоговая структура файлов
+
+```
+project/
+│── women/
+│   ├── admin.py  # Настройка отображения моделей в админке
+│   ├── models.py  # Определение моделей Women и Category
+│   ├── views.py  # Контроллеры (не затронуты в этом уроке)
+│   ├── templates/
+│   │   ├── admin/  # Шаблоны админки (если кастомизируем)
+```
