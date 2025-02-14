@@ -3652,3 +3652,152 @@ for i in lst:
 - `ExtractYear`, `ExtractMonth`, `ExtractDay` – извлечение частей даты.
 - `Round` – округление чисел.
 - `Log`, `Exp`, `Power` – математические вычисления.
+
+## 5.6 Оптимизация сайта с Django Debug Toolbar
+
+### Для чего использовать Django Debug Toolbar
+
+С помощью `Django Debug Toolbar` можно проверить:
+
+- скорость работы приложения;
+- нагрузку на СУБД (частоту и сложность запросов);
+- корректность возвращаемых пользователю данных.
+
+#### Установка и настройка
+
+- Установка:
+
+```bash
+pip install django-debug-toolbar
+```
+
+- В файле `settings.py` нужно зарегистрировать приложение, добавив в `INSTALLED_APPS`:
+
+```python
+INSTALLED_APPS = [
+    ...
+    'debug_toolbar',
+]
+```
+
+- В этом же файле в коллекции `MIDDLEWARE` нужно прописать:
+
+```python
+MIDDLEWARE = [
+    ...
+    'debug_toolbar.middleware.DebugToolbarMiddleware',
+]
+```
+
+- В `settings.py` добавляем коллекцию `INTERNAL_IPS`:
+
+```python
+INTERNAL_IPS = [
+    '127.0.0.1',
+]
+```
+
+- В файле `urls.py` пакета конфигурации (`myproject/urls.py`) добавляем маршрут:
+
+```python
+from django.urls import path, include
+
+urlpatterns = [
+    path('admin/', admin.site.urls),
+    path('', include('women.urls')),
+    path("__debug__/", include("debug_toolbar.urls")),
+]
+```
+
+### Использование Debug Toolbar
+
+Запускаем тестовый веб-сервер, переходим на главную страницу сайта, и справа отображается панель Debug Toolbar.
+
+На панели можно увидеть:
+
+- версию Django;
+- время формирования страницы;
+- количество SQL-запросов;
+- список используемых шаблонов;
+- и другие метрики.
+
+Если кликнуть на SQL-запросы, можно увидеть их подробности, включая ORM-команды и сгенерированные SQL-запросы.
+
+### Оптимизация запросов
+
+При анализе Debug Toolbar можно заметить, что один и тот же SQL-запрос выполняется несколько раз. Это связано с тем, что в шаблоне используется отложенный запрос:
+
+```html
+<p class="first">Категория: {{ p.cat.name }}</p>
+```
+
+Django по умолчанию использует **ленивые запросы** (Lazy Queries). Они выполняются только при обращении к данным. Однако, когда таких обращений много, число SQL-запросов резко возрастает.
+
+#### Django предлагает два метода оптимизации:
+
+- `select_related(key)` – загружает связанные данные по внешнему ключу (ForeignKey) одним SQL-запросом.
+- `prefetch_related(key)` – загружает связанные данные для полей ManyToManyField.
+
+Используем `select_related` в представлении `index()`:
+
+```python
+def index(request):
+    data = {
+        'title': 'Главная страница',
+        'menu': menu,
+        'posts': Women.published.all().select_related('cat'),
+        'cat_selected': 0,
+    }
+    return render(request, 'women/index.html', data)
+```
+
+Теперь, благодаря **"жадной" загрузке**, Django сразу подтягивает связанные данные, избегая дублирующихся SQL-запросов.
+
+После обновления страницы можно заметить сокращение числа SQL-запросов в Debug Toolbar.
+
+### Оптимизация других представлений
+
+- **Функция `show_category()`**:
+
+```python
+def show_category(request, cat_id):
+    posts = Women.published.filter(cat_id=cat_id).select_related('cat')
+    context = {
+        'posts': posts,
+        'cat_selected': cat_id,
+    }
+    return render(request, 'women/index.html', context)
+```
+
+- **Функция `show_tag_postlist()`**:
+
+```python
+def show_tag_postlist(request, tag_slug):
+    posts = Women.published.filter(tags__slug=tag_slug).prefetch_related('tags')
+    context = {
+        'posts': posts,
+        'tag_selected': tag_slug,
+    }
+    return render(request, 'women/index.html', context)
+```
+
+### Разбор функционала Django Debug Toolbar
+
+- **Versions** – версия Django и Python.
+- **Time** – общее время рендеринга страницы.
+- **Settings** – текущие настройки Django.
+- **Headers** – HTTP-заголовки запроса.
+- **Request** – параметры запроса (GET/POST).
+- **SQL** – список выполненных SQL-запросов.
+- **Templates** – список использованных шаблонов.
+- **Static Files** – загруженные статические файлы.
+- **Signals** – обработанные сигналы Django.
+
+### Итоговая схема подключения Debug Toolbar
+
+1. Устанавливаем пакет `django-debug-toolbar`.
+2. Добавляем `debug_toolbar` в `INSTALLED_APPS`.
+3. Регистрируем `DebugToolbarMiddleware` в `MIDDLEWARE`.
+4. Указываем `INTERNAL_IPS = ['127.0.0.1']`.
+5. Добавляем `path("__debug__/", include("debug_toolbar.urls"))` в `urls.py`.
+6. Анализируем SQL-запросы и оптимизируем их с `select_related` и `prefetch_related`.
