@@ -3514,3 +3514,141 @@ for p in w:
 ```
 
 Django выполнит один SQL-запрос, получая все необходимые данные. Это делает ORM Django высокоэффективным инструментом работы с базой данных.
+
+## 5.5 Группировка записей в Django ORM
+
+### Пример группировки записей
+
+Для подсчета количества постов в каждой категории можно воспользоваться следующим запросом:
+
+```python
+from django.db.models import Count
+
+Women.objects.values("cat_id").annotate(Count("id"))
+```
+
+Графически это можно представить так:
+
+1. Записи группируются по `cat_id`.
+2. Для каждой группы выполняется подсчет количества записей.
+
+Метод `values("cat_id")` формирует группы по `cat_id`, а `annotate(Count("id"))` выполняет подсчет количества записей в каждой группе.
+
+При необходимости можно изменить имя параметра `id__count`, задав его явно в методе `annotate()`:
+
+```python
+Women.objects.values('cat_id').annotate(total=Count('id'))
+```
+
+### Фильтрация сгруппированных данных
+
+Группировка записей позволяет не только агрегировать данные, но и фильтровать их. Например, отберем категории, у которых количество постов больше нуля:
+
+```python
+lst = Category.objects.annotate(total=Count("posts")).filter(total__gt=0)
+```
+
+В результате SQL-запрос группирует записи по `id`, `name`, `slug`, добавляя к ним дополнительное поле `total`.
+
+Отобразим результаты в консоли:
+
+```python
+for i, x in enumerate(lst):
+    if i == 0:
+        print(list(x.__dict__)[1:])
+    print(list(x.__dict__.values())[1:])
+```
+
+Выходные данные:
+
+```
+['id', 'name', 'slug', 'total']
+[1, 'Актрисы', 'aktrisy', 5]
+[2, 'Певицы', 'pevicy', 5]
+```
+
+По аналогии можно отобрать все теги из таблицы `TagPost`, которым соответствует хотя бы одна статья:
+
+```python
+lst = TagPost.objects.annotate(total=Count("tags")).filter(total__gt=0)
+```
+
+### Оптимизация сложных запросов
+
+Запросы с группировкой и агрегатными функциями могут быть ресурсоемкими. Перед их использованием стоит оценить необходимость выполнения вычислений на стороне СУБД. Иногда проще получить список данных и обработать его в Python.
+
+### Применение группировки в шаблонах Django
+
+Для отображения только значащих тегов обновим функцию `show_all_tags()` в `women_tags.py`:
+
+```python
+from django import template
+from django.db.models import Count
+from women.models import TagPost
+
+register = template.Library()
+
+@register.inclusion_tag('women/list_tags.html')
+def show_all_tags():
+    return {"tags": TagPost.objects.annotate(total=Count("tags")).filter(total__gt=0)}
+```
+
+Запускаем сервер и теперь отображаются только теги, имеющие статьи.
+
+Аналогично поступим с рубриками:
+
+```python
+@register.inclusion_tag('women/list_categories.html')
+def show_categories(cat_selected_id=0):
+    cats = Category.objects.annotate(total=Count("posts")).filter(total__gt=0)
+    return {"cats": cats, "cat_selected": cat_selected_id}
+```
+
+Теперь видны только заполненные рубрики.
+
+### Вычисления на стороне СУБД
+
+Django содержит набор встроенных функций для выполнения вычислений в базе данных.
+
+Эти функции представляют собой обертки над SQL-функциями и включают работу со строками, датами, математические операции и др.
+
+Использование этих функций является рекомендуемой практикой, так как СУБД оптимизирована для их выполнения.
+
+### Пример: вычисление длины строки
+
+Импортируем функцию `Length`:
+
+```python
+from django.db.models.functions import Length
+```
+
+Аннотируем поле `len_name`, чтобы вычислить длину имени в таблице `Husband`:
+
+```python
+lst = Husband.objects.annotate(len_name=Length('name'))
+```
+
+Выведем результат:
+
+```python
+for i in lst:
+    print(i.name, i.len_name)
+```
+
+Результат:
+
+```
+Брэд Питт 9
+Том Акерли 10
+Дэниэл Модер 12
+Кук Марони 10
+Сергей Балакирев 16
+```
+
+### Другие полезные функции
+
+- `Upper` / `Lower` – преобразование строки в верхний / нижний регистр.
+- `Concat` – объединение строк.
+- `ExtractYear`, `ExtractMonth`, `ExtractDay` – извлечение частей даты.
+- `Round` – округление чисел.
+- `Log`, `Exp`, `Power` – математические вычисления.
