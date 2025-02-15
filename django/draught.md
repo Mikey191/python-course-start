@@ -4154,3 +4154,103 @@ def set_draft(self, request, queryset):
 ```
 
 Здесь `messages.WARNING` указывает, что сообщение будет оформлено как предупреждение.
+
+## 6.4 Панель поиска и панель фильтрации в админ-панели Django
+
+### Добавление панели поиска
+
+Панель поиска добавляется с помощью атрибута `search_fields` в классе `WomenAdmin`. Указываем в нем список полей, по которым следует выполнять поиск.
+
+```python
+@admin.register(Women)
+class WomenAdmin(admin.ModelAdmin):
+    list_display = ('title', 'time_create', 'is_published', 'cat', 'brief_info')
+    list_display_links = ('title', )
+    list_editable = ('is_published', )
+    ordering = ['-time_create', 'title']
+    actions = ['set_published', 'set_draft']
+    search_fields = ['title']
+```
+
+После добавления `search_fields`, при переходе в админ-панель появится поле поиска.
+
+### Поиск по внешнему ключу
+
+Если мы хотим добавить поиск по категориям. В `Women` есть внешний ключ `cat`. Однако если мы просто добавим его в `search_fields`:
+
+```python
+search_fields = ['title', 'cat']
+```
+
+Мы получим ошибку, так как поиск выполняется по конкретным полям, а не по самому внешнему ключу. Нам нужно указать конкретное поле связанной модели:
+
+```python
+search_fields = ['title', 'cat__name']
+```
+
+Теперь поиск будет работать по заголовкам и названиям категорий.
+
+### Использование lookup'ов
+
+В `search_fields` можно добавлять lookup'ы, например, искать только по началу строки:
+
+```python
+search_fields = ['title__startswith', 'cat__name']
+```
+
+Теперь поиск "Дж" покажет только записи, заголовок которых начинается с "Дж".
+
+### Настройка панели фильтрации
+
+Фильтрация в админ-панели добавляется с помощью атрибута `list_filter`. Например:
+
+```python
+list_filter = ['cat__name', 'is_published']
+```
+
+После обновления страницы справа появится панель фильтрации по категориям и статусу публикации.
+
+### Создание собственного фильтра
+
+Допустим, у нас есть поле `husband`, указывающее на мужа женщины (если он есть). Добавим фильтр для разделения записей на "Замужем" и "Не замужем".
+
+Создадим класс фильтра перед `WomenAdmin`:
+
+```python
+class MarriedFilter(admin.SimpleListFilter):
+    title = 'Статус женщин'
+    parameter_name = 'status'
+
+    def lookups(self, request, model_admin):
+        return [
+            ('married', 'Замужем'),
+            ('single', 'Не замужем'),
+        ]
+
+    def queryset(self, request, queryset):
+        return queryset  # Пока фильтр ничего не делает
+```
+
+Добавляем фильтр в `list_filter`:
+
+```python
+list_filter = [MarriedFilter, 'cat__name', 'is_published']
+```
+
+После обновления страницы справа появится наш фильтр. Если кликнуть "Замужем", в URL добавится параметр `status=married`:
+
+```
+http://127.0.0.1:8000/admin/women/women/?status=married
+```
+
+#### Теперь реализуем сам фильтр:
+
+```python
+    def queryset(self, request, queryset):
+        if self.value() == 'married':
+            return queryset.filter(husband__isnull=False)
+        elif self.value() == 'single':
+            return queryset.filter(husband__isnull=True)
+```
+
+Теперь при выборе фильтра в списке отобразятся только соответствующие записи.
