@@ -4254,3 +4254,128 @@ http://127.0.0.1:8000/admin/women/women/?status=married
 ```
 
 Теперь при выборе фильтра в списке отобразятся только соответствующие записи.
+
+## 6.5 Настройка формы редактирования записей в админ-панели Django
+
+### Настройка списка отображаемых полей
+
+По умолчанию Django отображает все редактируемые поля модели. Однако, если мы хотим явно задать, какие поля должны присутствовать в форме, можно использовать атрибут `fields`:
+
+```python
+@admin.register(Women)
+class WomenAdmin(admin.ModelAdmin):
+    fields = ['title', 'content', 'slug']
+```
+
+В этом случае в форме отобразятся только три поля. Их порядок соответствует указанному в списке `fields`.
+
+### Ошибка при сохранении записи
+
+Допустим, мы пытаемся добавить новую запись:
+
+- **title**: Екатерина Гусева
+- **slug**: ekaterina-guseva
+- **content**: Биография Екатерины Гусевой
+
+После нажатия на кнопку «Сохранить» получаем ошибку, так как не заполнены обязательные поля, например, **категория** (cat). Чтобы избежать этой ошибки, добавим его в `fields`:
+
+```python
+fields = ['title', 'slug', 'content', 'cat']
+```
+
+Теперь запись успешно сохраняется.
+
+### Исключение полей
+
+Вместо явного указания `fields`, можно использовать атрибут `exclude`, чтобы убрать ненужные поля:
+
+```python
+@admin.register(Women)
+class WomenAdmin(admin.ModelAdmin):
+    exclude = ['tags', 'is_published']
+```
+
+Теперь на форме не будут отображаться поля **tags** и **is_published**, а остальные появятся автоматически.
+
+### Поля только для чтения
+
+Можно сделать некоторые поля доступными только для чтения с помощью `readonly_fields`:
+
+```python
+@admin.register(Women)
+class WomenAdmin(admin.ModelAdmin):
+    fields = ['title', 'slug', 'content', 'cat', 'husband']
+    readonly_fields = ['slug']
+```
+
+В этом случае поле **slug** будет отображаться, но его нельзя будет редактировать.
+
+В этом случае поле **slug** будет отображаться, но его нельзя будет редактировать.
+
+### Автозаполнение поля slug
+
+При добавлении новой записи поле `slug` будет пустым, и если попытаться сохранить запись дважды, возникнет ошибка из-за дублирования значений.
+
+Мы можем исправить это, автоматически заполняя `slug` при сохранении.
+
+Для этого переопределим метод `save()` в модели:
+
+```python
+from django.utils.text import slugify
+
+class Women(models.Model):
+    ...
+    def save(self, *args, **kwargs):
+        self.slug = slugify(self.title, allow_unicode=True)
+        super().save(*args, **kwargs)
+```
+
+Однако, `allow_unicode=True` приводит к сохранению русских символов, что может вызвать ошибки при открытии страницы. Исправить это можно с помощью функции транслитерации:
+
+```python
+def translit_to_eng(s: str) -> str:
+    d = {'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd',
+         'е': 'e', 'ё': 'yo', 'ж': 'zh', 'з': 'z', 'и': 'i', 'к': 'k',
+         'л': 'l', 'м': 'm', 'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r',
+         'с': 's', 'т': 't', 'у': 'u', 'ф': 'f', 'х': 'h', 'ц': 'c', 'ч': 'ch',
+         'ш': 'sh', 'щ': 'shch', 'ь': '', 'ы': 'y', 'ъ': '', 'э': 'r', 'ю': 'yu', 'я': 'ya'}
+    return "".join(map(lambda x: d[x] if x in d else x, s.lower()))
+```
+
+И заменяем вызов `slugify(self.title, allow_unicode=True)` на:
+
+```python
+self.slug = slugify(translit_to_eng(self.title))
+```
+
+### Более простой способ автозаполнения `slug`
+
+Он работает только в админ-панели.
+
+В `WomenAdmin` указываем атрибут `prepopulated_fields`:
+
+```python
+class WomenAdmin(admin.ModelAdmin):
+    fields = ['title', 'slug', 'content', 'cat', 'husband']
+    prepopulated_fields = {"slug": ("title",)}
+```
+
+Теперь `slug` автоматически формируется из `title`.
+
+### Улучшение работы с полем «Теги»
+
+Поле **tags** связано с моделью **Tag** отношением «многие ко многим». По умолчанию Django использует список с возможностью выбора нескольких значений с зажатой клавишей **Ctrl**.
+
+Мы можем улучшить этот интерфейс, используя `filter_horizontal`:
+
+```python
+class WomenAdmin(admin.ModelAdmin):
+    fields = ['title', 'slug', 'content', 'cat', 'husband', 'tags']
+    filter_horizontal = ['tags']
+```
+
+Также можно расположить списки вертикально, используя `filter_vertical`:
+
+```python
+filter_vertical = ['tags']
+```
