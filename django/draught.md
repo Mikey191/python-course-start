@@ -4029,3 +4029,128 @@ project/
 │   ├── templates/
 │   │   ├── admin/  # Шаблоны админки (если кастомизируем)
 ```
+
+## 6.3 Пользовательские поля и действия в админ-панели Django
+
+1. **Добавление пользовательского (нестандартного) поля в список статей** модели `Women`. Это поле не будет храниться в базе данных, а формироваться динамически на основе данных модели.
+2. **Создание пользовательских действий** (actions), которые можно применять к выбранным записям в админ-панели.
+
+### Определение нового поля
+
+Перейдем в файл `women/admin.py` и в классе `WomenAdmin` определим метод, который будет генерировать дополнительную информацию о записи. Пусть он называется `brief_info`:
+
+```python
+from django.contrib import admin
+from .models import Women
+
+class WomenAdmin(admin.ModelAdmin):
+    ...
+    def brief_info(self, women: Women):
+        return f"Описание {len(women.content)} символов."
+```
+
+- Метод `brief_info` принимает объект `women`, представляющий отдельную запись модели `Women`.
+- Возвращает строку, содержащую длину контента статьи.
+- Django автоматически передает в этот метод объект модели для каждой записи.
+
+### Добавление метода в `list_display`
+
+Теперь добавим этот метод в список отображаемых колонок `list_display`:
+
+```python
+class WomenAdmin(admin.ModelAdmin):
+    list_display = ('title', 'time_create', 'is_published', 'cat', 'brief_info')
+    list_display_links = ('title', )
+    list_editable = ('is_published', )
+    ordering = ['-time_create', 'title']
+
+    def brief_info(self, women: Women):
+        return f"Описание {len(women.content)} символов."
+```
+
+Теперь при обновлении админ-панели появится новый столбец **"brief_info"**.
+
+### Задание заголовка колонки
+
+Чтобы изменить отображаемое название колонки, используем декоратор `admin.display`:
+
+```python
+@admin.display(description="Краткое описание")
+def brief_info(self, women: Women):
+    return f"Описание {len(women.content)} символов."
+```
+
+Теперь в админ-панели заголовок колонки изменится на "Краткое описание".
+
+### Сортировка по пользовательскому полю
+
+Добавим возможность сортировки по этому полю:
+
+```python
+@admin.display(description="Краткое описание", ordering='content')
+def brief_info(self, women: Women):
+    return f"Описание {len(women.content)} символов."
+```
+
+Здесь `ordering='content'` указывает Django, что сортировка должна происходить на основе поля `content`.
+
+Нельзя указывать пользовательские поля напрямую в `ordering`. Django выдаст ошибку. Сортировка возможна только на базе существующих полей модели.
+
+### Добавление пользовательского действия
+
+Теперь добавим в админ-панель возможность изменять статус статей на "Опубликовано".
+
+```python
+class WomenAdmin(admin.ModelAdmin):
+    ...
+    def set_published(self, request, queryset):
+        queryset.update(is_published=Women.Status.PUBLISHED)
+
+    actions = ['set_published']
+```
+
+- Метод `set_published` принимает два аргумента:
+  - `request` — объект запроса;
+  - `queryset` — набор записей, которые выбрал администратор.
+- Вызывает `update()` для изменения статуса `is_published`.
+- Добавляем метод в список `actions`, чтобы он появился в выпадающем списке действий.
+
+### Изменение названия действия
+
+Добавим декоратор `@admin.action`, чтобы изменить название действия:
+
+```python
+@admin.action(description="Опубликовать выбранные записи")
+def set_published(self, request, queryset):
+    queryset.update(is_published=Women.Status.PUBLISHED)
+```
+
+Теперь при выборе записей появится действие **"Опубликовать выбранные записи"**.
+
+### Вывод сообщений после выполнения действия
+
+Добавим отображение количества измененных записей:
+
+```python
+@admin.action(description="Опубликовать выбранные записи")
+def set_published(self, request, queryset):
+    count = queryset.update(is_published=Women.Status.PUBLISHED)
+    self.message_user(request, f"Изменено {count} записи(ей).")
+```
+
+После выполнения команды администратор увидит сообщение о количестве обновленных записей.
+
+### Добавление обратного действия ("Снять с публикации")
+
+Также создадим обратное действие — снятие публикации:
+
+```python
+from django.contrib import messages
+
+@admin.action(description="Снять с публикации выбранные записи")
+def set_draft(self, request, queryset):
+    count = queryset.update(is_published=Women.Status.DRAFT)
+    self.message_user(request, f"{count} записи(ей) сняты с публикации!", messages.WARNING)
+```
+
+Здесь `messages.WARNING` указывает, что сообщение будет оформлено как предупреждение.
