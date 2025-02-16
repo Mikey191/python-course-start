@@ -4379,3 +4379,95 @@ class WomenAdmin(admin.ModelAdmin):
 ```python
 filter_vertical = ['tags']
 ```
+
+## 6.6 Настраиваем внешний вид админ-панели Django
+
+### Поиск нужных шаблонов
+
+Django использует шаблоны, расположенные в пакете `django.contrib.admin`. Основные файлы, отвечающие за структуру страницы админ-панели:
+
+- `admin/index.html`
+- `admin/base_site.html`
+- `admin/base.html`
+- `admin/app_list.html`
+
+Чтобы переопределить эти файлы в нашем проекте, создадим папку `templates/admin` внутри нашего Django-приложения и поместим туда необходимые файлы.
+
+### Создание собственного шаблона base_site.html. Создадим каталог для шаблонов
+
+Создадим структуру папок в нашем Django-приложении:
+
+```
+sitewomen/
+├── templates/
+│   ├── admin/
+│   │   ├── base_site.html
+```
+
+### Добавляем наш шаблон
+
+В файл `base_site.html` скопируем содержимое оригинального шаблона, а затем внесём изменения:
+
+```html
+{% extends "admin/base.html" %} {% block title %}Моя админка{% endblock %} {%
+block branding %}
+<h1>Панель управления сайтом</h1>
+{% endblock %}
+```
+
+Теперь при загрузке админки будет отображаться новый заголовок.
+
+### Добавление своих CSS-стилей. Подключаем файл стилей
+
+В `base_site.html` добавим блок `extrastyle`:
+
+```html
+{% load static %} {% block extrastyle %}
+<link rel="stylesheet" href="{% static 'css/admin/admin.css' %}" />
+{% endblock %}
+```
+
+### Создаём CSS-файл
+
+Создадим новый файл `admin.css` в папке `static/css/admin`:
+
+```
+static/
+├── css/
+│   ├── admin/
+│   │   ├── admin.css
+```
+
+Добавим в `admin.css` изменения:
+
+```css
+#header {
+  background: #3f4137;
+}
+
+.module caption {
+  background: #3f4137;
+}
+
+div.breadcrumbs {
+  background: #6a6e5d;
+}
+
+.module h2,
+.module caption,
+.inline-group h2 {
+  background: #6a6e5d;
+}
+```
+
+Теперь заголовок админ-панели и другие элементы изменят цвет фона.
+
+### Настройки `settings.py`
+
+Чтобы Django мог находить статические файлы, добавим в `settings.py`:
+
+```python
+STATICFILES_DIRS = [
+    BASE_DIR / 'static',
+]
+```
