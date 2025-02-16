@@ -4647,3 +4647,117 @@ def addpage(request):
 - `women/forms.py` — определение класса формы.
 - `women/views.py` — функция `addpage`, отвечающая за обработку формы.
 - `women/templates/women/addpage.html` — HTML-шаблон с отображением формы.
+
+## 7.3 Отображение полей формы. Сохранение переданных данных в БД
+
+При создании формы в Django названия полей по умолчанию отображаются на английском языке. Чтобы изменить это, можно использовать атрибут `label` внутри определения формы:
+
+```python
+from django import forms
+from .models import Category, Husband
+
+class AddPostForm(forms.Form):
+    title = forms.CharField(max_length=255, label="Заголовок")
+    slug = forms.SlugField(max_length=255, label="URL")
+    content = forms.CharField(widget=forms.Textarea(), required=False, label="Контент")
+    is_published = forms.BooleanField(required=False, initial=True, label="Статус")
+    cat = forms.ModelChoiceField(queryset=Category.objects.all(), empty_label="Категория не выбрана", label="Категории")
+    husband = forms.ModelChoiceField(queryset=Husband.objects.all(), required=False, empty_label="Не замужем", label="Муж")
+```
+
+Дополнительно можно:
+
+- Установить галочку `is_published` по умолчанию (`initial=True`)
+- Добавить `empty_label` в `ModelChoiceField`, чтобы вместо пустого значения отображались заданные строки
+
+### Ручное отображение полей формы
+
+В шаблоне можно выводить форму вручную, указывая поля с их атрибутами:
+
+```html
+<label class="form-label" for="{{ form.title.id_for_label }}"
+  >{{ form.title.label }}: </label
+>{{ form.title }}
+<div class="form-error">{{ form.title.errors }}</div>
+```
+
+Аналогично для остальных полей:
+
+```html
+<label class="form-label" for="{{ form.slug.id_for_label }}"
+  >{{ form.slug.label }}: </label
+>{{ form.slug }}
+<div class="form-error">{{ form.slug.errors }}</div>
+```
+
+Чтобы вывести ошибки формы, связанных не с конкретными полями, добавим вверху:
+
+```html
+<div class="form-error">{{ form.non_field_errors }}</div>
+```
+
+### Отображение формы через цикл
+
+Чтобы избежать дублирования кода, можно использовать `for`:
+
+```html
+<div class="form-error">{{ form.non_field_errors }}</div>
+{% for f in form %}
+<label class="form-label" for="{{ f.id_for_label }}">{{ f.label }}: </label>{{ f
+}}
+<div class="form-error">{{ f.errors }}</div>
+{% endfor %}
+```
+
+### Настройка виджетов
+
+Стили можно добавлять непосредственно в форму с помощью `widget`:
+
+```python
+title = forms.CharField(max_length=255, label="Заголовок", widget=forms.TextInput(attrs={'class': 'form-input'}))
+content = forms.CharField(widget=forms.Textarea(attrs={'cols': 50, 'rows': 5}), required=False, label="Контент")
+```
+
+Так можно задавать классы, размеры и другие HTML-атрибуты.
+
+### Тестирование формы
+
+Если отправить пустую форму, Django автоматически проверяет поля:
+
+```python
+{'title': 'example', 'slug': 'example-url', 'content': '', 'is_published': True, 'cat': <Category: Актрисы>, 'husband': None}
+```
+
+Если данные некорректны (например, в `slug` введены русские буквы), будет выведено сообщение об ошибке, а форма не будет обработана.
+
+### Сохранение данных в БД
+
+После валидации данных можно сохранить их в БД:
+
+```python
+if form.is_valid():
+    try:
+        Women.objects.create(**form.cleaned_data)
+        return redirect('home')
+    except:
+        form.add_error(None, 'Ошибка добавления поста')
+```
+
+- `form.cleaned_data` содержит проверенные данные формы
+- `Women.objects.create(**form.cleaned_data)` создаёт новую запись
+- В случае ошибки вызывается `form.add_error(None, 'Ошибка добавления поста')`
+- После успешного добавления пользователя перенаправляет на главную страницу (`redirect('home')`).
+
+### Итоговая схема файлов
+
+- `forms.py`: определение формы `AddPostForm`
+- `views.py`: обработка формы, валидация и сохранение
+- `template.html`: отображение формы
+- `models.py`: определение моделей `Women`, `Category`, `Husband`
+
+**Связи между файлами**:
+
+- `views.py` импортирует `AddPostForm` из `forms.py`
+- `views.py` передаёт `form` в контекст шаблона `template.html`
+- `models.py` содержит модели для полей формы
+- `forms.py` использует `Category.objects.all()` и `Husband.objects.all()` для выбора данных в `ModelChoiceField`
