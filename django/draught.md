@@ -4553,3 +4553,97 @@ def login_view(request):
 - `request.method == 'POST'` – проверяет, что запрос выполнен методом POST.
 - `request.POST.get('username')` – получает данные из формы.
 - `HttpResponse` – возвращает полученные данные (в реальном приложении нужно обработать их безопасно).
+
+## 7.2 Использование форм, не связанных с моделями в Django
+
+Django предоставляет удобный механизм для работы с формами с помощью класса `Form`, который позволяет создавать формы без привязки к моделям. Это полезно, когда необходимо обрабатывать данные, не связанные напрямую с базой данных, например, при создании форм обратной связи, поиска или регистрации, где данные должны обрабатываться, но не сохраняться в стандартной модели Django.
+
+### Где объявлять формы?
+
+По традиции, формы объявляют в отдельном файле `forms.py` внутри приложения.
+
+Создадим файл `women/forms.py` и импортируем пакет `forms`:
+
+```python
+from django import forms
+from .models import Category, Husband
+```
+
+Теперь определим класс `AddPostForm`, который будет использоваться для добавления статей.
+
+```python
+class AddPostForm(forms.Form):
+    title = forms.CharField(max_length=255)
+    slug = forms.SlugField(max_length=255)
+    content = forms.CharField(widget=forms.Textarea(), required=False)
+    is_published = forms.BooleanField(required=False)
+    cat = forms.ModelChoiceField(queryset=Category.objects.all())
+    husband = forms.ModelChoiceField(queryset=Husband.objects.all(), required=False)
+```
+
+Здесь мы определили несколько полей:
+
+- `title`: текстовое поле.
+- `slug`: поле для URL-идентификатора.
+- `content`: текстовое поле с `Textarea` (многострочный ввод).
+- `is_published`: флажок (по умолчанию обязательный, но мы сделали его необязательным).
+- `cat`: выбор категории из модели `Category`.
+- `husband`: выбор значения из модели `Husband` (необязательное поле).
+
+### Отображение формы в шаблоне
+
+После объявления формы ее можно передавать в представление `addpage()`.
+
+**Например**:
+
+```python
+def addpage(request):
+    form = AddPostForm()
+    return render(request, 'women/addpage.html', {'menu': menu, 'title': 'Добавление статьи', 'form': form})
+```
+
+Теперь подключим форму в `addpage.html`:
+
+```html
+<form action="" method="post">
+  {% csrf_token %} {{ form.as_p }}
+  <button type="submit">Добавить</button>
+</form>
+```
+
+Здесь:
+
+- `{% csrf_token %}` используется для защиты от CSRF-атак.
+- `{{ form.as_p }}` выводит форму, оборачивая поля в `<p>`.
+- `<button type="submit">` отправляет данные на сервер.
+
+### Обработка данных формы в представлении
+
+Теперь реализуем обработку данных формы в `addpage()`:
+
+```python
+def addpage(request):
+    if request.method == 'POST':
+        form = AddPostForm(request.POST)
+        if form.is_valid():
+            print(form.cleaned_data)
+    else:
+        form = AddPostForm()
+
+    return render(request, 'women/addpage.html', {'menu': menu, 'title': 'Добавление статьи', 'form': form})
+```
+
+Как это работает?
+
+1. При загрузке страницы отправляется `GET`-запрос, форма создается пустой.
+2. При отправке данных `POST`-запросом:
+   - Создается объект формы с данными `AddPostForm(request.POST)`.
+   - Проверяются данные с помощью `is_valid()`.
+   - Если валидация пройдена, выводится очищенный словарь данных `form.cleaned_data`.
+3. Если заполнить форму неверно (например, ввести русские символы в поле `slug`), Django автоматически выведет ошибку валидации.
+
+### Схема файлов проекта
+
+- `women/forms.py` — определение класса формы.
+- `women/views.py` — функция `addpage`, отвечающая за обработку формы.
+- `women/templates/women/addpage.html` — HTML-шаблон с отображением формы.
