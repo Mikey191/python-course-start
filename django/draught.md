@@ -4761,3 +4761,138 @@ if form.is_valid():
 - `views.py` передаёт `form` в контекст шаблона `template.html`
 - `models.py` содержит модели для полей формы
 - `forms.py` использует `Category.objects.all()` и `Husband.objects.all()` для выбора данных в `ModelChoiceField`
+
+## 7.4 Валидация полей формы. Создание пользовательского валидатора
+
+Каждое поле формы проверяется на корректность данных перед тем, как они попадут в базу данных. Поля формы Django имеют встроенные параметры, позволяющие задавать различные ограничения.
+
+Например, параметр `min_length` задает минимальную длину вводимого текста:
+
+```python
+from django import forms
+
+class AddPostForm(forms.Form):
+    title = forms.CharField(
+        max_length=255,
+        min_length=5,
+        label="Заголовок",
+        widget=forms.TextInput(attrs={'class': 'form-input'})
+    )
+```
+
+Значение `min_length` будет проверяться как на уровне HTML, так и на уровне Django.
+
+Если стандартные сообщения об ошибках нас не устраивают, можно задать их вручную через `error_messages`:
+
+```python
+class AddPostForm(forms.Form):
+    title = forms.CharField(
+        max_length=255,
+        min_length=5,
+        label="Заголовок",
+        widget=forms.TextInput(attrs={'class': 'form-input'}),
+        error_messages={
+            'min_length': 'Слишком короткий заголовок',
+            'required': 'Без заголовка - никак',
+        }
+    )
+```
+
+### Дополнительные валидаторы
+
+Поля форм и моделей Django поддерживают атрибут `validators`, который принимает список классов-валидаторов.
+
+Пример использования встроенных валидаторов:
+
+```python
+from django.core.validators import MinLengthValidator, MaxLengthValidator
+
+class AddPostForm(forms.Form):
+    slug = forms.SlugField(
+        max_length=255,
+        label="URL",
+        validators=[
+            MinLengthValidator(5),
+            MaxLengthValidator(100),
+        ]
+    )
+```
+
+Если стандартные сообщения не подходят, можно задать свои:
+
+```python
+slug = forms.SlugField(
+    max_length=255,
+    label="URL",
+    validators=[
+        MinLengthValidator(5, message="Минимум 5 символов"),
+        MaxLengthValidator(100, message="Максимум 100 символов"),
+    ]
+)
+```
+
+### Создание пользовательского валидатора
+
+Иногда встроенных валидаторов недостаточно. В таком случае можно создать свой класс валидации.
+
+Наш валидатор будет проверять, чтобы в поле были только русские буквы, цифры, дефис и пробел.
+
+```python
+from django.core.exceptions import ValidationError
+from django.utils.deconstruct import deconstructible
+
+@deconstructible
+class RussianValidator:
+    ALLOWED_CHARS = "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЬЫЪЭЮЯабвгдеёжзийклмнопрстуфхцчшщьыъэюя0123456789- "
+
+    def __init__(self, message=None):
+        self.message = message if message else "Должны присутствовать только русские символы, дефис и пробел."
+
+    def __call__(self, value):
+        if not set(value) <= set(self.ALLOWED_CHARS):
+            raise ValidationError(self.message)
+```
+
+Подключаем валидатор в форму:
+
+```python
+class AddPostForm(forms.Form):
+    title = forms.CharField(
+        max_length=255,
+        min_length=5,
+        label="Заголовок",
+        widget=forms.TextInput(attrs={'class': 'form-input'}),
+        validators=[RussianValidator()],
+        error_messages={
+            'min_length': 'Слишком короткий заголовок',
+            'required': 'Без заголовка - никак',
+        }
+    )
+```
+
+При вводе латинских символов форма выдаст сообщение об ошибке.
+
+### Валидация с помощью метода `clean_`
+
+Если требуется создать валидатор только для одного поля, можно использовать метод `clean_<имя_поля>`:
+
+```python
+class AddPostForm(forms.Form):
+    title = forms.CharField(max_length=255, min_length=5, label="Заголовок")
+
+    def clean_title(self):
+        title = self.cleaned_data['title']
+        ALLOWED_CHARS = "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЬЫЪЭЮЯабвгдеёжзийклмнопрстуфхцчшщьыъэюя0123456789- "
+        if not set(title) <= set(ALLOWED_CHARS):
+            raise ValidationError("Должны быть только русские символы, дефис и пробел.")
+        return title
+```
+
+Этот метод вызывается автоматически во время валидации формы.
+
+### Как работает механизм валидации в Django
+
+1. Данные отправляются на сервер.
+2. Django выполняет стандартную валидацию (например, `max_length`, `min_length`).
+3. Если стандартная валидация пройдена, запускаются пользовательские валидаторы.
+4. Если все проверки пройдены, данные сохраняются в БД.
