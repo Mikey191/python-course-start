@@ -4471,3 +4471,85 @@ STATICFILES_DIRS = [
     BASE_DIR / 'static',
 ]
 ```
+
+# 7. Работа с формами
+
+## 7.1 Что такое HTML-формы. Отправка данных по GET и POST-запросам
+
+Формы являются неотъемлемой частью большинства сайтов. Они позволяют пользователям вводить данные, которые затем отправляются на сервер. Например, авторизация, регистрация, поиск, отправка сообщений и другие формы взаимодействия с сайтом.
+
+Формы в HTML создаются с помощью тега `<form>` и могут содержать различные элементы ввода: текстовые поля, чекбоксы, списки, кнопки и т. д. Они используются для передачи данных на сервер, например, логина и пароля при входе на сайт.
+
+### Создание формы в HTML
+
+Рассмотрим базовую структуру формы:
+
+```html
+<form action="" method="get">
+  <label for="username">Имя пользователя:</label>
+  <input type="text" id="username" name="username" />
+
+  <label for="password">Пароль:</label>
+  <input type="password" id="password" name="password" />
+
+  <button type="submit">Войти</button>
+</form>
+```
+
+**Разбор кода**:
+
+- `<form action="" method="get">` – создаёт форму, которая отправляет данные методом GET.
+- `<label>` – предоставляет описание для элементов формы.
+- `<input type="text">` – поле ввода текста.
+- `<input type="password">` – поле ввода пароля (скрытые символы).
+- `<button type="submit">` – кнопка для отправки формы.
+
+### Отправка данных методом GET
+
+Метод GET используется по умолчанию и передаёт данные через URL. Пример запроса после отправки формы:
+
+```
+http://example.com/login?username=admin&password=1234
+```
+
+Этот метод не подходит для отправки конфиденциальных данных (например, паролей), так как они видны в URL-адресе.
+
+### Отправка данных методом POST
+
+Метод POST передаёт данные в теле HTTP-запроса и не отображает их в URL. Пример формы с методом POST:
+
+```html
+<form action="" method="post">
+  {% csrf_token %}
+  <label for="username">Имя пользователя:</label>
+  <input type="text" id="username" name="username" />
+
+  <label for="password">Пароль:</label>
+  <input type="password" id="password" name="password" />
+
+  <button type="submit">Войти</button>
+</form>
+```
+
+#### CSRF-токен
+
+Django требует наличия `{% csrf_token %}` в формах, использующих метод POST, для защиты от межсайтовых атак (CSRF).
+
+### Обработка данных формы в Django
+
+#### Представление (views.py)
+
+```python
+def login_view(request):
+    if request.method == 'POST':
+        username = request.POST.get('username')
+        password = request.POST.get('password')
+        return HttpResponse(f"Полученные данные: {username}, {password}")
+    return render(request, 'login.html')
+```
+
+**Разбор кода**:
+
+- `request.method == 'POST'` – проверяет, что запрос выполнен методом POST.
+- `request.POST.get('username')` – получает данные из формы.
+- `HttpResponse` – возвращает полученные данные (в реальном приложении нужно обработать их безопасно).
