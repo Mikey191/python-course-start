@@ -5281,3 +5281,106 @@ def addpage(request):
 - `women/forms.py` — форма `UploadFileForm`, расширенная `AddPostForm`.
 - `templates/women/addpage.html` — добавление `enctype="multipart/form-data"`.
 - `settings.py` — настройка `MEDIA_ROOT` и `MEDIA_URL`.
+
+## 7.8 Отображение загруженных изображений в HTML-документе и админ-панели
+
+**В этом разделе мы рассмотрим, как**:
+
+- Работать с загруженными изображениями в Django;
+- Корректно отображать изображения в шаблонах;
+- Подключать статические файлы в Django;
+- Добавлять миниатюры изображений в админ-панель.
+
+### Работа с полем ImageField
+
+При загрузке изображения в модель Django оно сохраняется в виде объекта `ImageFieldFile`, который содержит несколько полезных атрибутов и методов. Один из них – `url`, который предоставляет путь к загруженному файлу.
+
+Открываем Django Shell:
+
+```bash
+python manage.py shell_plus
+```
+
+Проверяем загруженный файл:
+
+```python
+w = Women.objects.all()[0]
+print(w.photo)  # путь к файлу
+print(w.photo.url)  # URL-адрес файла
+```
+
+### Отображение изображения в шаблоне post.html
+
+Добавляем проверку наличия фото перед заголовком поста:
+
+```html
+{% if post.photo %}
+<img class="img-article-left" src="{{ post.photo.url }}" />
+{% endif %}
+```
+
+Если изображение не загружается, проверяем вкладку «Network» в браузере. Скорее всего, сервер не может найти загруженные файлы, поскольку не настроена раздача медиа-файлов.
+
+### Настройка отображения медиа-файлов
+
+В файле `settings.py` добавляем:
+
+```python
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+```
+
+В `urls.py` конфигурации проекта:
+
+```python
+from django.conf import settings
+from django.conf.urls.static import static
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+```
+
+Теперь файлы раздаются корректно в режиме отладки.
+
+### Отображение изображений в списке постов (index.html)
+
+Добавляем перед заголовком поста:
+
+```html
+{% if p.photo %}
+<p><img class="img-article-left thumb" src="{{ p.photo.url }}" /></p>
+{% endif %}
+```
+
+### Отображение миниатюр в админ-панели
+
+В файле `admin.py` изменяем класс администратора:
+
+```python
+from django.utils.safestring import mark_safe
+
+@admin.display(description="Изображение")
+def post_photo(self, women: Women):
+    if women.photo:
+        return mark_safe(f"<img src='{women.photo.url}' width=50>")
+    return "Без фото"
+```
+
+Добавляем `post_photo` в `list_display`:
+
+```python
+list_display = ('title', 'post_photo', 'time_create', 'is_published', 'cat')
+```
+
+Теперь в админке отображаются миниатюры изображений.
+
+### Отображение миниатюры в форме редактирования
+
+Добавляем `post_photo` в `readonly_fields`, чтобы оно не редактировалось:
+
+```python
+@admin.register(Women)
+class WomenAdmin(admin.ModelAdmin):
+    fields = ['title', 'slug', 'content', 'photo', 'post_photo', 'cat', 'husband', 'tags']
+    readonly_fields = ['post_photo']
+```
