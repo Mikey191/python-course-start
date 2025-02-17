@@ -4896,3 +4896,125 @@ class AddPostForm(forms.Form):
 2. Django выполняет стандартную валидацию (например, `max_length`, `min_length`).
 3. Если стандартная валидация пройдена, запускаются пользовательские валидаторы.
 4. Если все проверки пройдены, данные сохраняются в БД.
+
+## 7.5 Формы, связанные с моделями в Django
+
+Когда форма предполагает тесное взаимодействие с моделью, лучше напрямую связать её с этой моделью.
+
+### Использование `ModelForm`
+
+Перейдем в файл `women/forms.py` и унаследуем `AddPostForm` от `forms.ModelForm`. Внутри объявим вложенный класс `Meta`, определяющий связь формы с моделью и список используемых полей:
+
+```python
+from django import forms
+from .models import Women
+
+class AddPostForm(forms.ModelForm):
+    class Meta:
+        model = Women
+        fields = '__all__'  # Все поля, кроме заполняемых автоматически
+```
+
+- Атрибут `model` связывает форму с моделью `Women`
+- Атрибут `fields='__all__'` указывает, что форма должна включать все поля модели, кроме тех, которые заполняются автоматически
+
+**Однако рекомендуется явно прописывать список полей**:
+
+```python
+fields = ['title', 'slug', 'content', 'is_published', 'cat', 'husband', 'tags']
+```
+
+### Настройка отображения полей формы
+
+Для стилизации формы можно использовать атрибут `widgets` в `Meta`:
+
+```python
+class AddPostForm(forms.ModelForm):
+    class Meta:
+        model = Women
+        fields = ['title', 'slug', 'content', 'is_published', 'cat', 'husband', 'tags']
+        widgets = {
+            'title': forms.TextInput(attrs={'class': 'form-input'}),
+            'content': forms.Textarea(attrs={'cols': 60, 'rows': 10}),
+        }
+```
+
+### Добавление `empty_label` к спискам
+
+Для полей выбора (`ModelChoiceField`) можно установить `empty_label`, чтобы обозначить пустое значение:
+
+```python
+from .models import Category, Husbands
+
+class AddPostForm(forms.ModelForm):
+    cat = forms.ModelChoiceField(queryset=Category.objects.all(), empty_label="Категория не выбрана", label="Категории")
+    husband = forms.ModelChoiceField(queryset=Husbands.objects.all(), required=False, empty_label="Не замужем", label="Муж")
+
+    class Meta:
+        model = Women
+        fields = ['title', 'slug', 'content', 'is_published', 'cat', 'husband', 'tags']
+        labels = {'slug': 'URL'}
+        widgets = {
+            'title': forms.TextInput(attrs={'class': 'form-input'}),
+            'content': forms.Textarea(attrs={'cols': 50, 'rows': 5}),
+        }
+```
+
+### Сохранение формы в базе данных
+
+Так как `ModelForm` автоматически создаёт метод `save()`, в `views.py` можно заменить `Women.objects.create(**form.cleaned_data)` на:
+
+```python
+form.save()
+```
+
+Функция `add_page`:
+
+```python
+def add_page(request):
+    if request.method == 'POST':
+        form = AddPostForm(request.POST)
+        if form.is_valid():
+            form.save()
+            return redirect('home')
+    else:
+        form = AddPostForm()
+
+    data = {
+        "menu": menu,
+        "title": "Добавление статьи",
+        'form': form
+    }
+    return render(request, "women/addpage.html", data)
+```
+
+Django также встроенно обрабатывает ошибки, например, если введён неуникальный `slug`, будет выведено соответствующее сообщение.
+
+### Создание собственных валидаторов формы
+
+Если встроенные проверки недостаточны, можно добавить кастомные валидаторы. Например, ограничим длину `title` до 50 символов:
+
+```python
+from django.core.exceptions import ValidationError
+
+class AddPostForm(forms.ModelForm):
+    def clean_title(self):
+        title = self.cleaned_data['title']
+        if len(title) > 50:
+            raise ValidationError('Длина превышает 50 символов')
+        return title
+```
+
+### Схематическое представление структуры файлов
+
+```
+project_root/
+│── women/
+│   │── models.py   # Определение моделей (Women, Category, Husbands)
+│   │── forms.py    # Определение формы AddPostForm
+│   │── views.py    # Представление addpage(), использующее form.save()
+│   │── templates/
+│   │   │── women/
+│   │   │   ├── addpage.html   # HTML-шаблон формы
+│   │── urls.py     # Добавление маршрута для addpage
+```
