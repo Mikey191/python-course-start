@@ -5158,3 +5158,126 @@ class UploadFileForm(forms.Form):
 ```
 
 Теперь форма принимает только изображения, а файлы других типов будут отклонены.
+
+## 7.7 Загрузка файлов с использованием моделей в Django
+
+Разберём, как связать загружаемые файлы с моделями базы данных, чтобы хранить информацию о загруженных файлах, таких как имя, пользователь, загрузивший файл, дата загрузки и другие параметры.
+
+### Определение модели для хранения файлов
+
+Для начала создадим модель в файле `women/models.py`, которая будет хранить ссылки на загруженные файлы:
+
+```python
+from django.db import models
+
+class UploadFiles(models.Model):
+    file = models.FileField(upload_to='uploads_model')
+```
+
+- Используется `FileField` из `models`, а не `forms`. Это поле создаёт соответствующую колонку в таблице БД.
+- Параметр `upload_to='uploads_model'` указывает каталог, в который будут загружаться файлы.
+
+После создания модели необходимо выполнить миграции:
+
+```bash
+python manage.py makemigrations
+python manage.py migrate
+```
+
+### Обработка загрузки файлов через представления
+
+Перейдём в `women/views.py` и изменим функцию `about()`, чтобы загружать файлы в модель:
+
+```python
+from django.shortcuts import render
+from .forms import UploadFileForm
+from .models import UploadFiles
+
+def about(request):
+    if request.method == "POST":
+        form = UploadFileForm(request.POST, request.FILES)
+        if form.is_valid():
+            fp = UploadFiles(file=form.cleaned_data['file'])
+            fp.save()
+    else:
+        form = UploadFileForm()
+
+    return render(request, 'women/about.html', {'title': 'О сайте', 'menu': menu, 'form': form})
+```
+
+- Форма получает данные из `request.FILES`.
+- После проверки данных создаётся объект модели `UploadFiles`, который сохраняет ссылку на файл в БД.
+- При загрузке файла Django автоматически создаст папку `uploads_model` и сохранит туда файл. В базе данных появится запись с путём к файлу.
+
+### Настройка глобальной директории для загружаемых файлов
+
+В файле `settings.py` укажем единую папку для хранения загружаемых файлов:
+
+```python
+MEDIA_ROOT = BASE_DIR / 'media'
+MEDIA_URL = '/media/'
+```
+
+Теперь файлы будут загружаться в `media/uploads_model`. Чтобы проверить, удалим старые файлы и перезапустим сервер, затем загрузим новый файл.
+
+### Добавление изображений к постам
+
+Сейчас файлы загружаются через обычные формы, но в Django можно использовать `ModelForm`, привязанные к модели. Добавим поле `photo` в модель `Women`:
+
+```python
+class Women(models.Model):
+    photo = models.ImageField(upload_to="photos/%Y/%m/%d/", default=None, blank=True, null=True, verbose_name="Фото")
+```
+
+- `ImageField` автоматически проверяет, что загруженный файл — изображение.
+- `upload_to="photos/%Y/%m/%d/"` создаёт подпапки по дате загрузки (год, месяц, день).
+
+После изменений создадим и выполним миграции:
+
+```bash
+python manage.py makemigrations
+python manage.py migrate
+```
+
+### Обновление шаблонов
+
+В файле `addpage.html` добавим атрибут `enctype` в форму:
+
+```html
+<form method="post" enctype="multipart/form-data"></form>
+```
+
+### Обновление форм в `women/forms.py`
+
+Включим поле `photo` в список полей формы `AddPostForm`:
+
+```python
+fields = ['title', 'slug', 'content', 'photo', 'is_published', 'cat', 'husband', 'tags']
+```
+
+### Изменение представления `addpage()` в `women/views.py`
+
+Добавим обработку файлов:
+
+```python
+def addpage(request):
+    if request.method == 'POST':
+        form = AddPostForm(request.POST, request.FILES)
+        if form.is_valid():
+            form.save()
+            return redirect('home')
+    else:
+        form = AddPostForm()
+
+    return render(request, 'women/addpage.html', {'menu': menu, 'title': 'Добавление статьи', 'form': form})
+```
+
+Теперь файлы загружаются в `media/photos/YYYY/MM/DD/` и связываются с постами.
+
+### Итоговая схема файлов
+
+- `women/models.py` — создание моделей (`UploadFiles`, `Women`).
+- `women/views.py` — обработка загрузки файлов в функциях `about()` и `addpage()`.
+- `women/forms.py` — форма `UploadFileForm`, расширенная `AddPostForm`.
+- `templates/women/addpage.html` — добавление `enctype="multipart/form-data"`.
+- `settings.py` — настройка `MEDIA_ROOT` и `MEDIA_URL`.
