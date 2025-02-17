@@ -5018,3 +5018,143 @@ project_root/
 │   │   │   ├── addpage.html   # HTML-шаблон формы
 │   │── urls.py     # Добавление маршрута для addpage
 ```
+
+## 7.6 Загрузка (upload) файлов на сервер в Django
+
+### Базовая HTML-форма для загрузки файлов
+
+создадим HTML-форму для загрузки файлов. Эта форма будет прикреплена к существующему маршруту:
+
+`http://127.0.0.1:8000/about/`
+
+В шаблоне `about.html` после заголовка `<h1>` добавим следующую форму:
+
+```html
+<form action="" method="post" enctype="multipart/form-data">
+  {% csrf_token %}
+  <p><input type="file" name="file_upload" /></p>
+  <p><button type="submit">Отправить</button></p>
+</form>
+```
+
+**Обратите внимание:**
+
+- Атрибут `enctype="multipart/form-data"` обязателен. Без него файлы не будут передаваться на сервер.
+- Поле `<input type="file" name="file_upload">` позволяет пользователю выбрать файл.
+- Используем `{% csrf_token %}` для защиты от CSRF-атак.
+
+### Обработка загружаемого файла в представлении
+
+Теперь настроим обработчик файла в представлении `about()`. В нем проверим, какие данные приходят при отправке формы. Добавим функцию `handle_uploaded_file()`, которая будет сохранять файл на сервере:
+
+```python
+def handle_uploaded_file(f):
+    with open(f"uploads/{f.name}", "wb+") as destination:
+        for chunk in f.chunks():
+            destination.write(chunk)
+```
+
+**Бывает ошибка в пути `uploads/{f.name}`. Тогда путь надо поменять**:
+
+```python
+def handle_uploaded_file(f):
+    with open(f"sitewomen/uploads/{f.name}", "wb+") as destination:
+        for chunk in f.chunks():
+            destination.write(chunk)
+```
+
+Метод `chunks()` используется для обработки больших файлов, так как он загружает их по частям, а не целиком.
+
+Обновим представление:
+
+```python
+def about(request):
+    if request.method == "POST":
+        handle_uploaded_file(request.FILES['file_upload'])
+    return render(request, 'women/about.html', {'title': 'О сайте', 'menu': menu})
+```
+
+При первой попытке загрузки мы можем столкнуться с ошибкой из-за отсутствия каталога `uploads`. Создадим его вручную в корне проекта.
+
+### Улучшение обработки загрузки с `FileField`
+
+Наш текущий метод обработки файлов имеет ряд недостатков:
+
+- Отсутствие валидации: если файл не выбран, возникнет ошибка.
+- Отсутствие стандартного способа работы с формами Django.
+
+**Используем Django Forms для решения этих проблем. В файле `forms.py` добавим класс**:
+
+```python
+from django import forms
+
+class UploadFileForm(forms.Form):
+    file = forms.FileField(label="Файл")
+```
+
+**Обновим представление**:
+
+```python
+def about(request):
+    if request.method == "POST":
+        form = UploadFileForm(request.POST, request.FILES)
+    else:
+        form = UploadFileForm()
+
+    return render(request, 'women/about.html', {'title': 'О сайте', 'menu': menu, 'form': form})
+```
+
+**Обновим шаблон `about.html`**:
+
+```html
+<form action="" method="post" enctype="multipart/form-data">
+  {% csrf_token %} {{ form.as_p }}
+  <button type="submit">Отправить</button>
+</form>
+```
+
+Теперь форма автоматически проверяет вводимые данные.
+
+**Добавим проверку перед сохранением файла**:
+
+```python
+def about(request):
+    if request.method == "POST":
+        form = UploadFileForm(request.POST, request.FILES)
+        if form.is_valid():
+            handle_uploaded_file(form.cleaned_data['file'])
+    else:
+        form = UploadFileForm()
+
+    return render(request, 'women/about.html', {'title': 'О сайте', 'menu': menu, 'form': form})
+```
+
+Теперь, если пользователь не выберет файл, Django выведет сообщение об ошибке.
+
+### Уникальные имена загружаемых файлов
+
+Проблема: файлы с одинаковыми именами будут перезаписывать друг друга. Решим это с помощью модуля `uuid`:
+
+```python
+import uuid
+
+def handle_uploaded_file(f):
+    name, ext = f.name.rsplit('.', 1)
+    unique_name = f"{name}_{uuid.uuid4()}.{ext}"
+    with open(f"uploads/{unique_name}", "wb+") as destination:
+        for chunk in f.chunks():
+            destination.write(chunk)
+```
+
+Теперь файлы получают уникальные имена и не затирают друг друга.
+
+### Загрузка изображений с `ImageField`
+
+Иногда необходимо загружать только изображения. Для этого используется `ImageField`, который является расширением `FileField`. Обновим `forms.py`:
+
+```python
+class UploadFileForm(forms.Form):
+    file = forms.ImageField(label="Изображение")
+```
+
+Теперь форма принимает только изображения, а файлы других типов будут отклонены.
