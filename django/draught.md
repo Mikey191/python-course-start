@@ -5636,3 +5636,74 @@ class WomenCategory(ListView):
    - `path('category/<slug:cat_slug>/', WomenCategory.as_view(), name='category')`
 3. **templates/women/index.html**:
    - Использует `posts` вместо `object_list`
+
+## 8.3 Класс DetailView в Django
+
+### Объявление класса ShowPost
+
+Создадим новый класс `ShowPost`, унаследованный от `DetailView`:
+
+```python
+class ShowPost(DetailView):
+    model = Women
+    template_name = 'women/post.html'
+```
+
+Мы здесь сразу указали два атрибута:
+
+- `model` – указывает, с какой моделью работает представление;
+- `template_name` – указывает путь к шаблону, который будет использоваться для отображения.
+
+### Обновление маршрутов
+
+Теперь заменим маршрут `show_post()` в файле `women/urls.py`:
+
+```python
+path('post/<slug:post_slug>/', views.ShowPost.as_view(), name='post'),
+```
+
+### Исправление ошибки AttributeError
+
+При попытке просмотра поста возникнет ошибка `AttributeError`. Это происходит потому, что `DetailView` ищет запись по `pk` или `slug`, а у нас маршрут использует `post_slug`. Решить проблему можно двумя способами:
+
+1. Изменить параметр маршрута на `slug`.
+2. Добавить в `ShowPost` атрибут:
+
+```python
+slug_url_kwarg = 'post_slug'
+```
+
+Если в маршруте использовался бы `id`, то потребовалось бы указать `pk_url_kwarg = 'post_id'`.
+
+### Передача переменной в шаблон
+
+По умолчанию `DetailView` передает в шаблон объект с именем `object` и его название в нижнем регистре (`women`). Если в шаблоне используется `post`, добавим атрибут:
+
+```python
+context_object_name = 'post'
+```
+
+Теперь переменная `post` доступна в `post.html`, и данные отображаются корректно.
+
+### Добавление заголовка и меню
+
+Добавим заголовок `title` и меню:
+
+```python
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = context['post']
+        context['menu'] = menu
+        return context
+```
+
+### Фильтрация опубликованных записей
+
+Сейчас можно открыть статью независимо от её статуса публикации. Это можно исправить, переопределив метод `get_object()`:
+
+```python
+    def get_object(self, queryset=None):
+        return get_object_or_404(Women.published, slug=self.kwargs[self.slug_url_kwarg])
+```
+
+Метод `get_object_or_404()` ищет запись с переданным `slug` среди опубликованных записей (`Women.published`). Если запись не найдена, будет вызвана ошибка 404.
