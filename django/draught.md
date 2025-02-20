@@ -5384,3 +5384,110 @@ class WomenAdmin(admin.ModelAdmin):
     fields = ['title', 'slug', 'content', 'photo', 'post_photo', 'cat', 'husband', 'tags']
     readonly_fields = ['post_photo']
 ```
+
+# 8. Классы представлений
+
+## 8.1 Введение в CBV (Class Based Views). Классы View и TemplateView
+
+Классы представлений (`CBV` - `Class-Based Views`) позволяют структурировать код в объектно-ориентированном стиле.
+
+CBV чаще применяются на практике, поскольку их использование делает код более читаемым, переиспользуемым и удобным в поддержке.
+
+### Класс View
+
+Все классы представлений в Django наследуются от базового класса `View`, который предоставляет базовую функциональность для обработки запросов.
+
+Основные методы:
+
+- `get(self, request)`: обработка GET-запросов
+- `post(self, request)`: обработка POST-запросов
+
+**Пример объявления класса View:**
+
+```python
+from django.views import View
+from django.shortcuts import render, redirect
+from .forms import AddPostForm
+
+menu = [
+    {"title": "О сайте", "url_name": "about"},
+    {"title": "Добавить статью", "url_name": "add_page"},
+    {"title": "Обратная связь", "url_name": "contact"},
+    {"title": "Войти", "url_name": "login"},
+]
+
+class AddPage(View):
+    def get(self, request):
+        form = AddPostForm()
+        return render(request, 'women/addpage.html', {
+            'menu': menu,
+            'title': 'Добавление статьи',
+            'form': form
+        })
+
+    def post(self, request):
+        form = AddPostForm(request.POST, request.FILES)
+        if form.is_valid():
+            form.save()
+            return redirect('home')
+        return render(request, 'women/addpage.html', {
+            'menu': menu,
+            'title': 'Добавление статьи',
+            'form': form
+        })
+```
+
+### Подключение класса View к маршрутам
+
+В файле `urls.py` добавляем маршрут:
+
+```python
+from django.urls import path
+from .views import AddPage
+
+urlpatterns = [
+    path('addpage/', AddPage.as_view(), name='add_page'),
+]
+```
+
+### Класс TemplateView
+
+`TemplateView` - это CBV, который предназначен для отображения HTML-шаблона. Используется, если в представлении не требуется сложная логика обработки.
+
+```python
+from django.views.generic import TemplateView
+
+class WomenHome(TemplateView):
+    template_name = 'women/index.html'
+    extra_context = {
+        'title': 'Главная страница',
+        'menu': menu,
+        'posts': Women.published.all().select_related('cat'),
+        'cat_selected': 0,
+    }
+```
+
+### Подключаем в `urls.py`:
+
+```python
+urlpatterns = [
+    path('', WomenHome.as_view(), name='home'),
+]
+```
+
+### Использование метода get_context_data
+
+Для передачи динамических данных в шаблон можно переопределить метод `get_context_data`:
+
+```python
+class WomenHome(TemplateView):
+    template_name = 'women/index.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = 'Главная страница'
+        context['menu'] = menu
+        context['posts'] = Women.published.all().select_related('cat')
+        context['cat_selected'] = int(self.request.GET.get('cat_id', 0))
+        return context
+```
