@@ -5491,3 +5491,148 @@ class WomenHome(TemplateView):
         context['cat_selected'] = int(self.request.GET.get('cat_id', 0))
         return context
 ```
+
+## 8.2 Класс ListView в Django
+
+Класс `ListView`, предназначен для отображения списков записей из базы данных.
+
+### Импорт класса ListView
+
+В начале импортируем `ListView`:
+
+```python
+from django.views.generic import ListView
+```
+
+И укажем его в качестве базового класса:
+
+```python
+class WomenHome(ListView):
+    ...
+```
+
+Если запустить сервер и открыть главную страницу, появится ошибка. Это связано с тем, что `ListView` ожидает данные из базы данных. Поэтому нужно определить атрибут `model`:
+
+```python
+class WomenHome(ListView):
+    model = Women
+```
+
+Это аналогично следующему SQL-запросу:
+
+```sql
+SELECT * FROM women;
+```
+
+Django автоматически ищет шаблон с именем `<имя_приложения>/<имя_модели>_list.html`, в данном случае `women/women_list.html`. Если его нет, возникнет ошибка `TemplateDoesNotExist`.
+
+### Использование собственного шаблона
+
+Чтобы указать конкретный шаблон, используем `template_name`:
+
+```python
+class WomenHome(ListView):
+    model = Women
+    template_name = 'women/index.html'
+```
+
+Но теперь список статей не отображается. По умолчанию `ListView` передает записи в переменную `object_list`. Поэтому в шаблоне нужно заменить `posts` на `object_list`, либо задать собственное имя:
+
+```python
+class WomenHome(ListView):
+    model = Women
+    template_name = 'women/index.html'
+    context_object_name = 'posts'
+```
+
+Теперь в шаблоне можно снова использовать `posts`.
+
+### Передача дополнительных данных
+
+Дополнительные данные можно передавать через `extra_context`:
+
+```python
+class WomenHome(ListView):
+    model = Women
+    template_name = 'women/index.html'
+    context_object_name = 'posts'
+    extra_context = {
+        'title': 'Главная страница',
+        'menu': menu,
+        'cat_selected': 0,
+    }
+```
+
+Но `extra_context` работает только для статичных данных. Для динамических значений переопределим метод `get_context_data()`:
+
+```python
+class WomenHome(ListView):
+    model = Women
+    template_name = 'women/index.html'
+    context_object_name = 'posts'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = 'Главная страница'
+        context['menu'] = menu
+        context['cat_selected'] = 0
+        return context
+```
+
+### Переопределение выборки записей
+
+По умолчанию `ListView` получает все записи модели. Если нужно изменить выборку, переопределяем `get_queryset()`:
+
+```python
+class WomenHome(ListView):
+    template_name = 'women/index.html'
+    context_object_name = 'posts'
+
+    def get_queryset(self):
+        return Women.published.all().select_related('cat')
+```
+
+### Класс ListView для категорий
+
+Создадим аналогичный `ListView` для категорий:
+
+```python
+class WomenCategory(ListView):
+    template_name = 'women/index.html'
+    context_object_name = 'posts'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        cat = context['posts'][0].cat
+        context['title'] = f'Категория - {cat.name}'
+        context['menu'] = menu
+        context['cat_selected'] = cat.id
+        return context
+
+    def get_queryset(self):
+        return Women.published.filter(cat__slug=self.kwargs['cat_slug']).select_related('cat')
+```
+
+Настроим маршрут в `urls.py`:
+
+```python
+path('category/<slug:cat_slug>/', WomenCategory.as_view(), name='category')
+```
+
+Если указать несуществующую категорию, страница будет пустой. Для отображения ошибки 404 добавим `allow_empty = False`:
+
+```python
+class WomenCategory(ListView):
+    allow_empty = False
+```
+
+### Итоговая схема файлов
+
+1. **views.py**:
+   - `WomenHome(ListView)`: главная страница
+   - `WomenCategory(ListView)`: категории
+2. **urls.py**:
+   - `path('', WomenHome.as_view(), name='home')`
+   - `path('category/<slug:cat_slug>/', WomenCategory.as_view(), name='category')`
+3. **templates/women/index.html**:
+   - Использует `posts` вместо `object_list`
