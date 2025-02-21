@@ -5862,3 +5862,117 @@ Django автоматически передает форму в шаблон ч
   </form>
   {% endblock %}
   ```
+
+## 8.5 Классы CreateView и UpdateView в Django
+
+Django предоставляет мощные инструменты для работы с формами и моделями в виде обобщенных классов представлений (Generic Class-Based Views, CBV). Одними из наиболее часто используемых классов являются `CreateView` и `UpdateView`, предназначенные соответственно для создания и редактирования объектов в базе данных.
+
+### Класс CreateView
+
+Класс `CreateView` позволяет упростить создание новых записей в базе данных, автоматически подставляя соответствующую модель и форму. Он берет на себя:
+
+- обработку GET-запросов (выводит форму для заполнения);
+- обработку POST-запросов (сохраняет данные в базу и выполняет перенаправление);
+- проверку валидности формы;
+- перенаправление на указанный `success_url` либо `get_absolute_url()` модели.
+
+Рассмотрим, как можно заменить стандартный `FormView` классом `CreateView`.
+
+```python
+from django.views.generic import CreateView
+from django.urls import reverse_lazy
+from .models import Women
+from .forms import AddPostForm
+
+class AddPage(CreateView):
+    form_class = AddPostForm
+    template_name = 'women/addpage.html'
+    success_url = reverse_lazy('home')
+    extra_context = {
+        'menu': menu,
+        'title': 'Добавление статьи',
+    }
+```
+
+После запуска сервера результат останется прежним.
+
+### Использование CreateView без формы
+
+Можно не определять `form_class`, а использовать модель напрямую:
+
+```python
+class AddPage(CreateView):
+    model = Women
+    template_name = 'women/addpage.html'
+    success_url = reverse_lazy('home')
+    fields = '__all__'
+    extra_context = {
+        'menu': menu,
+        'title': 'Добавление статьи',
+    }
+```
+
+Здесь `fields = '__all__'` означает, что в форму попадут все поля модели `Women`. Однако, если требуется ограниченный список полей, можно указать их явно:
+
+```python
+fields = ['title', 'slug', 'content', 'is_published', 'cat']
+```
+
+Если исключить обязательное поле, например `cat`, то при отправке формы возникнет ошибка.
+
+### Класс UpdateView
+
+`UpdateView` предназначен для редактирования существующих записей. Он работает аналогично `CreateView`, но автоматически заполняет форму данными существующего объекта.
+
+Создадим представление для редактирования статьи:
+
+```python
+from django.views.generic import UpdateView
+
+class UpdatePage(UpdateView):
+    model = Women
+    fields = ['title', 'content', 'photo', 'is_published', 'cat']
+    template_name = 'women/addpage.html'
+    success_url = reverse_lazy('home')
+    extra_context = {
+        'menu': menu,
+        'title': 'Редактирование статьи',
+    }
+```
+
+Отличия от `CreateView`:
+
+- `model` указывает, с какой таблицей работаем;
+- `fields` определяет список редактируемых полей;
+- форма автоматически заполняется существующими значениями из базы данных.
+
+### Добавление маршрута для редактирования с помощью атрибута `pk`
+
+В файле `urls.py` добавляем маршрут для редактирования:
+
+```python
+from django.urls import path
+from .views import UpdatePage
+
+urlpatterns = [
+    path('edit/<int:pk>/', UpdatePage.as_view(), name='edit_page'),
+]
+```
+
+Перейдя по адресу `http://127.0.0.1:8000/edit/1/`, увидим форму с загруженными данными статьи с `id=1`.
+
+### Использование `slug` вместо `id`
+
+Если нужно выбирать записи по `slug`, изменяем маршрут:
+
+```python
+path('edit/<slug:slug>/', UpdatePage.as_view(), name='edit_page')
+```
+
+### Схема взаимосвязей файлов:
+
+- `views.py` – содержит классы `AddPage` и `UpdatePage`
+- `urls.py` – содержит маршруты
+- `models.py` – содержит модель `Women`
+- `forms.py` – содержит форму `AddPostForm`
+- `templates/women/addpage.html` – шаблон формы
