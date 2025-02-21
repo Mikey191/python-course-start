@@ -6097,3 +6097,105 @@ class AddPage(DataMixin, CreateView):
 - `views.py`:
   - Импортирует `DataMixin` из `utils.py`.
   - Наследует представления от `DataMixin`.
+
+## 8.7 Введение в пагинацию. Класс Paginator
+
+«Пагинация» (от лат. pagina – страница) позволяет представлять длинные списки данных на нескольких страницах, чтобы HTML-документ не был слишком громоздким, а пользователю было удобнее ориентироваться.
+
+### Пример работы класса Paginator
+
+Предположим, у нас есть список имен известных женщин:
+
+```python
+women = ['Анджелина Джоли', 'Дженнифер Лоуренс', 'Джулия Робертс', 'Марго Робби', 'Ума Турман',
+         'Ариана Гранде', 'Бейонсе', 'Кэтти Перри', 'Рианна', 'Шакира']
+```
+
+Допустим, мы хотим отображать их по три имени на странице.
+
+Для начала импортируем `Paginator`:
+
+```python
+from django.core.paginator import Paginator
+```
+
+Создадим экземпляр класса `Paginator`:
+
+```python
+p = Paginator(women, 3)
+```
+
+Теперь мы можем использовать различные свойства:
+
+```python
+print(p.count)  # Число элементов в списке (10)
+print(p.num_pages)  # Число страниц (4)
+print(list(p.page_range))  # Итератор номеров страниц [1, 2, 3, 4]
+```
+
+Получение первой страницы:
+
+```python
+p1 = p.page(1)  # Первая страница
+print(p1.object_list)  # ['Анджелина Джоли', 'Дженнифер Лоуренс', 'Джулия Робертс']
+print(p1.has_next())  # True
+print(p1.has_previous())  # False
+print(p1.has_other_pages())  # True
+print(p1.next_page_number())  # 2
+```
+
+### Использование Paginator в Django
+
+Если в проекте Django используются функции-представления, необходимо вручную создавать объект `Paginator` и определять номер текущей страницы.
+
+Пример кода представления `about()`:
+
+```python
+from django.core.paginator import Paginator
+from django.shortcuts import render
+from .models import Women
+
+def about(request):
+    contact_list = Women.published.all()
+    paginator = Paginator(contact_list, 3)
+
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    return render(request, 'women/about.html', {'page_obj': page_obj, 'title': 'О сайте'})
+```
+
+Здесь:
+
+- Мы получаем все записи `Women.published.all()`.
+- Создаем объект `Paginator`, передавая ему список и количество элементов на странице.
+- Получаем номер текущей страницы из `GET` параметра.
+- Создаем объект `page_obj`, который передаем в шаблон.
+
+### Отображение пагинации в шаблоне
+
+В файле `about.html`:
+
+```django
+{% for contact in page_obj %}
+<p>{{ contact }}</p>
+{% endfor %}
+```
+
+Чтобы отобразить ссылки на номера страниц:
+
+```django
+<nav>
+    <ul>
+        {% for p in page_obj.paginator.page_range %}
+        <li>
+            <a href="?page={{ p }}">{{ p }}</a>
+        </li>
+        {% endfor %}
+    </ul>
+</nav>
+```
+
+Этот код формирует ссылки на страницы. Переход на страницу возможен через `?page=N` в URL.
+
+Если передать некорректный параметр (`?page=abc`), будет отображена первая страница, а при указании слишком большого номера — последняя страница.
