@@ -5707,3 +5707,158 @@ context_object_name = 'post'
 ```
 
 Метод `get_object_or_404()` ищет запись с переданным `slug` среди опубликованных записей (`Women.published`). Если запись не найдена, будет вызвана ошибка 404.
+
+## 8.4 Класс FormView в Django
+
+Класс `FormView` предназначен для упрощения отображения и обработки HTML-форм.
+
+### Замена базового класса View на FormView
+
+Ранее мы создавали класс **AddPage**, унаследованный от **View**, для отображения формы добавления статей. Однако, правильнее использовать **FormView**, так как он специально предназначен для работы с формами. Объявим новый класс:
+
+```python
+from django.views.generic.edit import FormView
+from django.urls import reverse_lazy
+from .forms import AddPostForm
+
+class AddPage(FormView):
+    form_class = AddPostForm
+    template_name = 'women/addpage.html'
+    success_url = reverse_lazy('home')
+```
+
+- `form_class` — ссылка на класс формы, используемой в представлении.
+- `template_name` — путь к шаблону, в котором отображается форма.
+- `success_url` — маршрут для перенаправления после успешной отправки формы.
+- `reverse_lazy('home')` — используется вместо `reverse('home')`, так как `reverse()` не работает при загрузке модуля, если маршрут еще не зарегистрирован.
+
+#### Почему `reverse_lazy`?
+
+Функция `reverse_lazy()` позволяет избежать ошибки, возникающей при загрузке модуля, если маршрут **'home'** еще не определен. Она вычисляет маршрут **только в момент его использования**, а не заранее.
+
+### Добавление контекста в шаблон
+
+Если мы откроем страницу `/addpage/`, то заметим, что не отображается меню и заголовок страницы. Добавим их с помощью атрибута **extra_context**:
+
+```python
+class AddPage(FormView):
+    form_class = AddPostForm
+    template_name = 'women/addpage.html'
+    success_url = reverse_lazy('home')
+    extra_context = {
+        'menu': menu,
+        'title': 'Добавление статьи',
+    }
+```
+
+Теперь при рендеринге шаблона будут передаваться дополнительные переменные.
+
+### Обработка данных формы
+
+Попробуем добавить статью, но после отправки форма не сохраняет данные в базе. Это связано с тем, что **FormView** сам по себе только отображает форму и проверяет её корректность, но не сохраняет данные. Для этого нужно переопределить метод `form_valid()`:
+
+```python
+class AddPage(FormView):
+    form_class = AddPostForm
+    template_name = 'women/addpage.html'
+    success_url = reverse_lazy('home')
+    extra_context = {
+        'menu': menu,
+        'title': 'Добавление статьи',
+    }
+
+    def form_valid(self, form):
+        form.save()
+        return super().form_valid(form)
+```
+
+- `form_valid(self, form)`: метод вызывается после успешной проверки данных.
+- `form.save()`: сохраняет данные в базу.
+- `return super().form_valid(form)`: вызывает метод базового класса для выполнения стандартного поведения (перенаправления на `success_url`).
+
+Если в форме есть дополнительные проверки, их можно выполнить перед вызовом `super().form_valid(form)`.
+
+### Передача данных в шаблон
+
+Django автоматически передает форму в шаблон через переменную `form`. Если в шаблоне указано другое имя переменной, форма не отобразится.
+
+Пример кода в `addpage.html`:
+
+```html
+<form method="post">
+  {% csrf_token %} {{ form.as_p }}
+  <button type="submit">Добавить</button>
+</form>
+```
+
+При этом важно, чтобы в шаблоне **form** был именно таким же, как переданный Django.
+
+### Схема взаимосвязей файлов
+
+- `views.py`
+
+  ```python
+  from django.views.generic.edit import FormView
+  from django.urls import reverse_lazy
+  from .forms import AddPostForm
+
+  class AddPage(FormView):
+      form_class = AddPostForm
+      template_name = 'women/addpage.html'
+      success_url = reverse_lazy('home')
+      extra_context = {
+          'menu': menu,
+          'title': 'Добавление статьи',
+      }
+
+      def form_valid(self, form):
+          form.save()
+          return super().form_valid(form)
+  ```
+
+- `forms.py`
+
+  ```python
+  from django import forms
+  from .models import Post
+
+  class AddPostForm(forms.ModelForm):
+      class Meta:
+          model = Post
+          fields = ['title', 'slug', 'content', 'is_published']
+  ```
+
+- `urls.py`
+
+  ```python
+  from django.urls import path
+  from .views import AddPage
+
+  urlpatterns = [
+      path('addpage/', AddPage.as_view(), name='addpage'),
+  ]
+  ```
+
+- `models.py`
+
+  ```python
+  from django.db import models
+
+  class Post(models.Model):
+      title = models.CharField(max_length=255)
+      slug = models.SlugField(unique=True)
+      content = models.TextField()
+      is_published = models.BooleanField(default=True)
+  ```
+
+- `addpage.html`
+
+  ```html
+  {% extends 'base.html' %} {% block content %}
+  <h1>{{ title }}</h1>
+  <form method="post">
+    {% csrf_token %} {{ form.as_p }}
+    <button type="submit">Добавить</button>
+  </form>
+  {% endblock %}
+  ```
