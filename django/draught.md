@@ -5976,3 +5976,124 @@ path('edit/<slug:slug>/', UpdatePage.as_view(), name='edit_page')
 - `models.py` – содержит модель `Women`
 - `forms.py` – содержит форму `AddPostForm`
 - `templates/women/addpage.html` – шаблон формы
+
+## 8.6 Mixins как способ улучшения программного кода
+
+Идея паттерна миксинов заключается в том, что они позволяют повторно использовать определенный функционал в разных классах, не нарушая принципы наследования.
+
+### Пример использования миксинов
+
+```python
+class LegsMixin:
+    def has_legs(self):
+        return True
+
+class CoverRectMixin:
+    def cover_shape(self):
+        return "rectangular"
+
+class CoverRoundMixin:
+    def cover_shape(self):
+        return "round"
+
+class BackMixin:
+    def has_back(self):
+        return True
+
+class Table(LegsMixin, CoverRectMixin):
+    pass
+
+class RoundTable(LegsMixin, CoverRoundMixin):
+    pass
+
+class Chair(LegsMixin, CoverRectMixin, BackMixin):
+    pass
+```
+
+### Использование миксинов в Django
+
+В Django миксины позволяют избежать дублирования кода, добавляя общий функционал к классам представлений. Например, вынесем наполнение шаблонов стандартной информацией в отдельный миксин `DataMixin`.
+
+### Определение DataMixin
+
+Обычно вспомогательные классы в Django определяют в файле `utils.py`. Создадим этот файл и добавим туда следующий код:
+
+```python
+menu = [
+    {'title': "О сайте", 'url_name': 'about'},
+    {'title': "Добавить статью", 'url_name': 'add_page'},
+    {'title': "Обратная связь", 'url_name': 'contact'},
+    {'title': "Войти", 'url_name': 'login'}
+]
+
+class DataMixin:
+    def get_mixin_context(self, context, **kwargs):
+        context['menu'] = menu
+        context['cat_selected'] = None
+        context.update(kwargs)
+        return context
+```
+
+Этот миксин определяет метод `get_mixin_context()`, который добавляет в контекст шаблона меню и другие стандартные параметры.
+
+### Использование DataMixin в представлениях
+
+Теперь применим этот миксин в представлениях:
+
+```python
+from django.views.generic import ListView, DetailView
+from .utils import DataMixin
+from .models import Women
+
+class WomenHome(DataMixin, ListView):
+    model = Women
+
+    def get_context_data(self, *, object_list=None, **kwargs):
+        return self.get_mixin_context(super().get_context_data(**kwargs), title='Главная страница', cat_selected=0)
+```
+
+Здесь `get_context_data()` вызывает `get_mixin_context()` для объединения стандартного контекста с дополнительными параметрами.
+
+### Оптимизация с использованием extra_context
+
+Можно ещё больше оптимизировать код, добавив поддержку `extra_context`:
+
+```python
+class DataMixin:
+    title_page = None
+    extra_context = {}
+
+    def __init__(self):
+        if self.title_page:
+            self.extra_context['title'] = self.title_page
+        if 'menu' not in self.extra_context:
+            self.extra_context['menu'] = menu
+
+    def get_mixin_context(self, context, **kwargs):
+        if self.title_page:
+            context['title'] = self.title_page
+        context['menu'] = menu
+        context['cat_selected'] = None
+        context.update(kwargs)
+        return context
+```
+
+Теперь в представлениях можно просто указывать `title_page`:
+
+```python
+class AddPage(DataMixin, CreateView):
+    model = Women
+    template_name = 'women/addpage.html'
+    success_url = reverse_lazy('home')
+    title_page = 'Добавление статьи'
+```
+
+### Схема файлов
+
+- `utils.py`:
+  - Определяет `DataMixin`.
+- `models.py`:
+  - Определяет модель `Women`.
+- `views.py`:
+  - Импортирует `DataMixin` из `utils.py`.
+  - Наследует представления от `DataMixin`.
