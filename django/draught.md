@@ -6199,3 +6199,142 @@ def about(request):
 Этот код формирует ссылки на страницы. Переход на страницу возможен через `?page=N` в URL.
 
 Если передать некорректный параметр (`?page=abc`), будет отображена первая страница, а при указании слишком большого номера — последняя страница.
+
+## 8.8 Пагинация с использованием ListView в Django
+
+В Django механизм пагинации встроен, и достаточно просто указать количество элементов на странице с помощью атрибута:
+
+```python
+paginate_by = N
+```
+
+где `N` - количество элементов на одной странице.
+
+### Добавление пагинации в `ListView`
+
+Создадим представление `WomenHome`, используя `ListView`, и добавим атрибут `paginate_by`:
+
+```python
+from django.views.generic import ListView
+from .models import Women
+
+class WomenHome(ListView):
+    model = Women
+    template_name = 'women/index.html'
+    context_object_name = 'posts'
+    paginate_by = 3
+```
+
+Теперь главная страница будет отображать только три записи на странице.
+
+### Отображение пагинации в шаблоне
+
+В `base.html` добавим блок навигации:
+
+```html
+{% block navigation %}{% endblock %}
+```
+
+Теперь, в `index.html` пропишем код для вывода номеров страниц:
+
+```html
+<nav class="list-pages">
+  <ul>
+    {% for p in paginator.page_range %}
+    <li class="page-num">
+      <a href="?page={{ p }}">{{ p }}</a>
+    </li>
+    {% endfor %}
+  </ul>
+</nav>
+```
+
+Здесь `paginator` - объект, который автоматически создаётся в шаблоне `ListView`, а `page_obj` содержит данные текущей страницы.
+
+Теперь при обновлении страницы появятся номера страниц.
+
+### Пагинация в категориях
+
+Если открыть рубрики, пагинация исчезает. Это происходит, потому что в классе `WomenCategory` нет атрибута `paginate_by`.
+
+Чтобы не дублировать код, создадим `DataMixin`, где определим `paginate_by`:
+
+```python
+class DataMixin:
+    paginate_by = 3
+```
+
+Теперь можно унаследовать `WomenHome` и `WomenCategory` от `DataMixin`:
+
+```python
+class WomenHome(DataMixin, ListView):
+    model = Women
+    template_name = 'women/index.html'
+    context_object_name = 'posts'
+```
+
+Теперь пагинация применяется ко всем страницам.
+
+### Удаление ссылки на текущую страницу
+
+Добавим условие в `index.html`, чтобы текущий номер страницы не был ссылкой:
+
+```html
+<nav class="list-pages">
+  <ul>
+    {% for p in paginator.page_range %} {% if page_obj.number == p %}
+    <li class="page-num page-num-selected">{{ p }}</li>
+    {% else %}
+    <li class="page-num">
+      <a href="?page={{ p }}">{{ p }}</a>
+    </li>
+    {% endif %} {% endfor %}
+  </ul>
+</nav>
+```
+
+### Ограничение количества номеров страниц
+
+Если страниц много, выведем только два номера слева и справа от текущей страницы:
+
+```html
+{% for p in paginator.page_range %} {% if page_obj.number == p %}
+<li class="page-num page-num-selected">{{ p }}</li>
+{% elif p >= page_obj.number|add:-2 and p <= page_obj.number|add:2 %}
+<li class="page-num">
+  <a href="?page={{ p }}">{{ p }}</a>
+</li>
+{% endif %} {% endfor %}
+```
+
+### Добавление ссылок «вперед» и «назад»
+
+Добавим ссылку на предыдущую страницу:
+
+```html
+{% if page_obj.has_previous %}
+<li class="page-num">
+  <a href="?page={{ page_obj.previous_page_number }}">&lt;</a>
+</li>
+{% endif %}
+```
+
+И на следующую:
+
+```html
+{% if page_obj.has_next %}
+<li class="page-num">
+  <a href="?page={{ page_obj.next_page_number }}">&gt;</a>
+</li>
+{% endif %}
+```
+
+### Итоговая схема файлов
+
+- **views.py**
+  - `WomenHome` (унаследован от `DataMixin` и `ListView`)
+  - `DataMixin` (определяет `paginate_by`)
+- **templates/base.html**
+  - Блок `{% block navigation %}{% endblock %}`
+- **templates/index.html**
+  - Код пагинации с `paginator` и `page_obj`
