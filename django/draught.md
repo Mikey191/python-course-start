@@ -6677,3 +6677,123 @@ def get_women_context(request):
 ```
 
 Здесь используется объект `user`, который автоматически передается в шаблон благодаря контекстному процессору `django.contrib.auth.context_processors.auth`.
+
+## 9.4 Классы LoginView, LogoutView и AuthenticationForm
+
+- **LoginView** — стандартный класс представления для авторизации пользователей.
+- **LogoutView** — стандартный класс для выхода из системы.
+- **AuthenticationForm** — стандартный класс формы обработки аутентификации.
+
+### Класс LoginView
+
+Класс **LoginView** заменяет написанную ранее вручную функцию `login_user()`. Реализуем его следующим образом:
+
+```python
+from django.contrib.auth.views import LoginView
+from django.contrib.auth.forms import AuthenticationForm
+
+class LoginUser(LoginView):
+    form_class = AuthenticationForm  # Используем стандартную форму аутентификации
+    template_name = 'users/login.html'  # Шаблон для отображения страницы
+    extra_context = {'title': "Авторизация"}  # Дополнительные данные в шаблон
+```
+
+- `form_class = AuthenticationForm` — мы используем стандартную форму аутентификации.
+- `template_name = 'users/login.html'` — указываем путь к HTML-шаблону формы входа.
+- `extra_context = {'title': "Авторизация"}` — передаем дополнительный контекст в шаблон.
+
+### Подключение маршрута
+
+Добавим маршрут в `users/urls.py`:
+
+```python
+from django.urls import path
+from .views import LoginUser
+
+urlpatterns = [
+    path('login/', LoginUser.as_view(), name='login'),
+]
+```
+
+### Изменение адреса перенаправления после входа
+
+По умолчанию после успешного входа пользователя перенаправляют на `http://127.0.0.1:8000/accounts/profile/`. Чтобы изменить этот адрес, переопределим метод `get_success_url`:
+
+```python
+from django.urls import reverse_lazy
+
+class LoginUser(LoginView):
+    form_class = AuthenticationForm
+    template_name = 'users/login.html'
+    extra_context = {'title': "Авторизация"}
+
+    def get_success_url(self):
+        return reverse_lazy('home')  # Перенаправление на главную страницу
+```
+
+Альтернативный способ — задать в `settings.py`:
+
+```python
+LOGIN_REDIRECT_URL = 'home'
+```
+
+Дополнительно в `settings.py` можно задать:
+
+- `LOGIN_URL = 'login'` — если пользователь не авторизован, он будет перенаправлен на страницу входа.
+- `LOGOUT_REDIRECT_URL = 'home'` — перенаправление после выхода из системы.
+
+### Улучшение формы авторизации
+
+Класс **LoginView** обрабатывает ошибки входа и передает их в форму. Улучшим отображение ошибок в `login.html`:
+
+```html
+<div class="form-error">{{ form.non_field_errors }}</div>
+{% for f in form %}
+<p><label for="{{ f.id_for_label }}">{{ f.label }}:</label> {{ f }}</p>
+<div class="form-error">{{ f.errors }}</div>
+{% endfor %}
+```
+
+Чтобы улучшить стиль формы, создадим `users/forms.py` и определим `LoginUserForm`, расширяя `AuthenticationForm`:
+
+```python
+from django.contrib.auth.forms import AuthenticationForm
+from django import forms
+
+class LoginUserForm(AuthenticationForm):
+    username = forms.CharField(label='Логин', widget=forms.TextInput(attrs={'class': 'form-input'}))
+    password = forms.CharField(label='Пароль', widget=forms.PasswordInput(attrs={'class': 'form-input'}))
+```
+
+Можно также использовать `Meta`:
+
+```python
+from django.contrib.auth import get_user_model
+
+class LoginUserForm(AuthenticationForm):
+    class Meta:
+        model = get_user_model()
+        fields = ['username', 'password']
+```
+
+### Параметр `next`
+
+Добавим скрытое поле `next` в `login.html`:
+
+```html
+<input type="hidden" name="next" value="{{ next }}" />
+```
+
+Если URL содержит `?next=/addpage/`, пользователь после авторизации будет перенаправлен на `/addpage/`. Это полезно для интернет-магазинов, где после входа покупатель сразу попадает на страницу оформления заказа.
+
+### Класс LogoutView
+
+Заменим функцию `logout_user()` стандартным классом **LogoutView**:
+
+```python
+from django.contrib.auth.views import LogoutView
+
+urlpatterns = [
+    path('logout/', LogoutView.as_view(), name='logout'),
+]
+```
