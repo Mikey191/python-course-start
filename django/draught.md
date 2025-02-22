@@ -6574,3 +6574,106 @@ project_root/
 │   ├── settings.py     # Настройки проекта
 │   ├── urls.py         # Глобальные маршруты
 ```
+
+## 9.3 Шаблонные контекстные процессоры в Django
+
+Мы знаем, что в Django рекомендуется делать приложения максимально независимыми друг от друга. Поэтому лучше всего отображение меню организовать в базовом шаблоне и передавать объект меню в виде списка. Это можно реализовать несколькими способами.
+
+### Использование пользовательского тега
+
+Создадим пользовательский тег в файле `women_tags.py`, который будет передавать список меню:
+
+```python
+from django import template
+from women.utils import menu
+
+register = template.Library()
+
+@register.simple_tag
+def get_menu():
+    return menu
+```
+
+Затем используем этот тег в `base.html`:
+
+```django
+{% get_menu as menu %}
+```
+
+Теперь меню автоматически передается в шаблон, и можно убрать его передачу из класса `DataMixin` в `women/utils.py`.
+
+### Контекстные процессоры
+
+Однако если требуется передавать независимые данные во все шаблоны, лучше использовать **шаблонные контекстные процессоры**.
+
+Контекстный процессор — это функция, которая возвращает словарь с данными, автоматически доступными во всех шаблонах проекта.
+
+В `settings.py`, в списке `context_processors`, можно увидеть уже подключенные процессоры, например:
+
+```python
+'context_processors': [
+    'django.template.context_processors.debug',
+    'django.template.context_processors.request',
+    'django.contrib.auth.context_processors.auth',
+    'django.contrib.messages.context_processors.messages',
+]
+```
+
+### Создание собственного контекстного процессора
+
+Создадим файл `context_processors.py` в приложении `users` и определим в нем функцию, передающую меню:
+
+```python
+from women.utils import menu
+
+def get_women_context(request):
+    return {'mainmenu': menu}
+```
+
+Добавим этот процессор в `settings.py`:
+
+```python
+'users.context_processors.get_women_context'
+```
+
+Теперь в `base.html` можно использовать `mainmenu`:
+
+```django
+{% for m in mainmenu %}
+    <li><a href="{% url m.url_name %}">{{ m.title }}</a></li>
+{% endfor %}
+```
+
+После этого `get_menu` можно удалить.
+
+### Доработка главного меню
+
+Теперь нужно доработать шаблон, убрав из меню пункт `login`, так как его будем обрабатывать отдельно. В `base.html` меню будет формироваться так:
+
+```django
+{% block mainmenu %}
+<div class="header">
+    <ul id="mainmenu" class="mainmenu">
+        <li class="logo"><a href="{% url 'home' %}"><div class="logo"></div></a></li>
+        {% for m in mainmenu %}
+            <li><a href="{% url m.url_name %}">{{ m.title }}</a></li>
+        {% endfor %}
+        <li class="last"><a href="{% url 'users:login' %}">Войти</a></li>
+    </ul>
+</div>
+{% endblock mainmenu %}
+```
+
+### Проверка авторизации пользователя
+
+Доработаем меню, чтобы оно отображало имя авторизованного пользователя или предлагало войти в систему.
+
+```django
+{% if user.is_authenticated %}
+    <li class="last">{{ user.username }} | <a href="{% url 'users:logout' %}">Выйти</a></li>
+{% else %}
+    <li class="last"><a href="{% url 'users:login' %}">Войти</a> | <a href="#">Регистрация</a></li>
+{% endif %}
+```
+
+Здесь используется объект `user`, который автоматически передается в шаблон благодаря контекстному процессору `django.contrib.auth.context_processors.auth`.
