@@ -6444,3 +6444,133 @@ app_name = "users"
 ```
 
 Теперь можно обращаться к маршруту авторизации через `users:login`.
+
+## 9.2 Авторизация пользователей. Функции authenticate() и login()
+
+Функции `authenticate()` и `login()` используются для проверки учетных данных пользователя и его входа в систему.
+
+### Создание формы входа
+
+Для начала создадим форму авторизации вручную. Добавим файл `forms.py` в приложение `users` и определим класс `LoginUserForm`:
+
+```python
+from django import forms
+
+class LoginUserForm(forms.Form):
+    username = forms.CharField(label='Логин', widget=forms.TextInput(attrs={'class': 'form-input'}))
+    password = forms.CharField(label='Пароль', widget=forms.PasswordInput(attrs={'class': 'form-input'}))
+```
+
+### Создание шаблона страницы авторизации
+
+Далее создадим шаблон для отображения формы. Внутри приложения `users` создадим каталог `templates/users` и разместим в нем файл `login.html`:
+
+```html
+{% extends 'base.html' %} {% block content %}
+<h1>Авторизация</h1>
+
+<form method="post">
+  {% csrf_token %} {{ form.as_p }}
+  <p><button type="submit">Войти</button></p>
+</form>
+{% endblock %}
+```
+
+### Добавление представления для обработки формы
+
+Теперь изменим функцию `login_user()` в файле `users/views.py`, чтобы передавать форму в шаблон:
+
+```python
+def login_user(request):
+    form = LoginUserForm()
+    return render(request, 'users/login.html', {'form': form})
+```
+
+### Реализация авторизации. Функция authenticate()
+
+Функция `authenticate()` проверяет учетные данные пользователя. Она принимает `username` и `password`, ищет пользователя в базе данных и возвращает объект пользователя, если учетные данные верны, иначе `None`.
+
+```python
+from django.contrib.auth import authenticate
+
+user = authenticate(request, username='user1', password='mypassword')
+if user is not None:
+    print("Пользователь найден")
+else:
+    print("Ошибка авторизации")
+```
+
+### Реализация авторизации. Функция login()
+
+Функция `login()` выполняет вход пользователя в систему, создавая соответствующую сессию. Вызов `login(request, user)` сохраняет информацию о пользователе в сессии, позволяя ему оставаться авторизованным на сайте.
+
+```python
+from django.contrib.auth import login
+
+if user is not None:
+    login(request, user)
+    print("Пользователь вошел в систему")
+```
+
+### Обновление представления login_user
+
+Теперь обновим `login_user()`, добавив обработку данных формы:
+
+```python
+from django.shortcuts import render, redirect
+from django.contrib.auth import authenticate, login
+from django.http import HttpResponseRedirect
+from django.urls import reverse
+
+def login_user(request):
+    if request.method == 'POST':
+        form = LoginUserForm(request.POST)
+        if form.is_valid():
+            cd = form.cleaned_data
+            user = authenticate(request, username=cd['username'], password=cd['password'])
+            if user and user.is_active:
+                login(request, user)
+                return HttpResponseRedirect(reverse('home'))
+    else:
+        form = LoginUserForm()
+    return render(request, 'users/login.html', {'form': form})
+```
+
+- Проверяем, является ли запрос `POST`.
+- Если форма корректна, извлекаем данные (`cleaned_data`).
+- Аутентифицируем пользователя с `authenticate()`.
+- Если пользователь найден и активен, выполняем вход через `login()`.
+- Перенаправляем пользователя на главную страницу.
+
+### Реализация выхода из системы
+
+Для выхода пользователя используем функцию `logout()`, которая удаляет данные о пользователе из сессии. После вызова `logout()`, сессия пользователя завершается, и происходит перенаправление на страницу входа.
+
+```python
+from django.contrib.auth import logout
+
+def logout_user(request):
+    logout(request)
+    return HttpResponseRedirect(reverse('users:login'))
+```
+
+### Структура файлов проекта
+
+```
+project_root/
+│── users/
+│   ├── forms.py        # Форма авторизации
+│   ├── views.py        # Представления login_user() и logout_user()
+│   ├── urls.py         # Маршруты для авторизации
+│   ├── templates/
+│   │   ├── users/
+│   │   │   ├── login.html   # Шаблон страницы входа
+│   ├── models.py       # (если потребуется расширение модели пользователя)
+│
+│── templates/
+│   ├── base.html       # Общий базовый шаблон
+│
+│── project_root/
+│   ├── settings.py     # Настройки проекта
+│   ├── urls.py         # Глобальные маршруты
+```
