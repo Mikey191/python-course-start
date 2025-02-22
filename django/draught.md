@@ -6338,3 +6338,109 @@ class WomenHome(DataMixin, ListView):
   - Блок `{% block navigation %}{% endblock %}`
 - **templates/index.html**
   - Код пагинации с `paginator` и `page_obj`
+
+# 9. Авторизация и регистрация
+
+## 9.1 Введение в авторизацию пользователей в Django
+
+Django предоставляет встроенные инструменты для работы с пользователями, включая их аутентификацию, авторизацию и управление сессиями.
+
+- **Authentication (аутентификация)** – процесс проверки личности пользователя. Чаще всего это проверка пары логин/пароль.
+- **Authorization (авторизация)** – процесс проверки прав доступа к закрытым частям сайта после успешной аутентификации.
+- **Session (сессия)** – механизм хранения информации о пользователе между запросами, например, идентификатор пользователя.
+
+Когда пользователь вводит логин и пароль, Django проверяет их на соответствие данным в базе. Если они совпадают, создается сессия, и все последующие запросы Django воспринимает как запросы от авторизованного пользователя.
+
+Если пользователь не авторизован, ему будет предложена форма входа, где необходимо ввести учетные данные.
+
+### Таблица `auth_user`
+
+Django автоматически создает таблицы для работы с пользователями при запуске проекта. Основная из них – `auth_user`. Она содержит:
+
+- `username` – имя пользователя
+- `password` – хеш пароля
+- `email` – почта
+- `is_active` – активен ли пользователь
+- `is_superuser` – флаг суперпользователя
+
+Помимо `auth_user`, есть вспомогательные таблицы:
+
+- `auth_permission` – хранит разрешения пользователей
+- `auth_group` – управляет группами пользователей
+
+Django позволяет настраивать и расширять модель пользователя, если встроенных полей недостаточно.
+
+### Создание приложения авторизации
+
+Разместим весь функционал авторизации в отдельном приложении `users`. Для его создания выполним команду:
+
+```bash
+python manage.py startapp users
+```
+
+Подключим его в `INSTALLED_APPS` в `settings.py`:
+
+```python
+INSTALLED_APPS = [
+    ...
+    "users.apps.UsersConfig",
+]
+```
+
+Также в `MIDDLEWARE` должны присутствовать:
+
+```python
+MIDDLEWARE = [
+    ...
+    'django.contrib.sessions.middleware.SessionMiddleware',
+    'django.contrib.auth.middleware.AuthenticationMiddleware',
+    ...
+]
+```
+
+### Маршруты авторизации
+
+Создадим файл `users/urls.py` и пропишем маршруты:
+
+```python
+from django.urls import path
+from . import views
+
+urlpatterns = [
+    path('login/', views.login_user, name='login'),
+    path('logout/', views.logout_user, name='logout'),
+]
+```
+
+Теперь определим представления в `users/views.py`:
+
+```python
+from django.http import HttpResponse
+
+def login_user(request):
+    return HttpResponse("login")
+
+def logout_user(request):
+    return HttpResponse("logout")
+```
+
+Подключим маршруты `users` в главный `urls.py` проекта:
+
+```python
+from django.contrib import admin
+from django.urls import path, include
+
+urlpatterns = [
+    path('admin/', admin.site.urls),
+    path('', include('main.urls')),
+    path('users/', include('users.urls', namespace="users")),
+]
+```
+
+Добавим `app_name` в `users/urls.py`, чтобы избежать конфликтов имен:
+
+```python
+app_name = "users"
+```
+
+Теперь можно обращаться к маршруту авторизации через `users:login`.
