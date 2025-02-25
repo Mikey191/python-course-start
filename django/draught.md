@@ -6926,3 +6926,155 @@ class AddPage(LoginRequiredMixin, DataMixin, CreateView):
 ```
 
 Если у статьи есть автор, будет отображаться его `username`. В противном случае будет показан текст «неизвестен».
+
+## 9.6 Регистрация пользователей через функции представления
+
+У нас уже есть ссылка "Регистрация" в меню, теперь создадим для нее маршрут, функцию представления и шаблон по аналогии с авторизацией.
+
+### Шаблон формы регистрации: Файл: `users/templates/users/register.html`
+
+```html
+{% extends 'base.html' %} {% block content %}
+<h1>Регистрация</h1>
+<form method="post">
+  {% csrf_token %}
+  <input type="hidden" name="next" value="{{ next }}" />
+  {{ form.as_p }}
+  <p><button type="submit">Регистрация</button></p>
+</form>
+{% endblock %}
+```
+
+Этот шаблон идентичен тому, что мы использовали для авторизации.
+
+### Форма регистрации. Файл: `users/forms.py`
+
+```python
+from django import forms
+from django.contrib.auth import get_user_model
+
+class RegisterUserForm(forms.ModelForm):
+    username = forms.CharField(label="Логин")
+    password = forms.CharField(label="Пароль", widget=forms.PasswordInput)
+    password2 = forms.CharField(label="Повтор пароля", widget=forms.PasswordInput)
+
+    class Meta:
+        model = get_user_model()
+        fields = ['username', 'email', 'first_name', 'last_name', 'password', 'password2']
+        labels = {
+            'email': 'E-mail',
+            'first_name': 'Имя',
+            'last_name': 'Фамилия',
+        }
+```
+
+Документация Django по модели `User`: https://docs.djangoproject.com/en/4.2/topics/auth/default/
+
+### Функция представления. Файл: `users/views.py`
+
+```python
+from django.shortcuts import render
+from .forms import RegisterUserForm
+
+def register(request):
+    form = RegisterUserForm()
+    return render(request, 'users/register.html', {'form': form})
+```
+
+### Маршруты. Файл: `users/urls.py`
+
+```python
+from django.urls import path
+from . import views
+from django.contrib.auth.views import LogoutView
+
+urlpatterns = [
+    path('login/', views.LoginUser.as_view(), name='login'),
+    path('logout/', LogoutView.as_view(), name='logout'),
+    path('register/', views.register, name='register'),
+]
+```
+
+### Файл: `base.html` (добавление ссылки)
+
+```html
+<li class="last">
+  <a href="{% url 'users:login' %}">Войти</a> |
+  <a href="{% url 'users:register' %}">Регистрация</a>
+</li>
+```
+
+Запустим сервер и перейдем по ссылке "Регистрация", чтобы проверить форму.
+
+### Проверка данных формы
+
+Добавим метод `clean_password2()`, который проверит совпадение паролей:
+
+```python
+    def clean_password2(self):
+        cd = self.cleaned_data
+        if cd['password'] != cd['password2']:
+            raise forms.ValidationError("Пароли не совпадают!")
+        return cd['password2']
+```
+
+Также проверим уникальность email:
+
+```python
+    def clean_email(self):
+        email = self.cleaned_data['email']
+        if User.objects.filter(email=email).exists():
+            raise forms.ValidationError("Такой E-mail уже существует!")
+        return email
+```
+
+### Реализация регистрации. Файл: `users/views.py`
+
+Теперь реализуем логику регистрации в представлении:
+
+```python
+from django.contrib.auth import login
+from django.contrib.auth.models import User
+
+def register(request):
+    if request.method == "POST":
+        form = RegisterUserForm(request.POST)
+        if form.is_valid():
+            user = form.save(commit=False)
+            user.set_password(form.cleaned_data['password'])
+            user.save()
+            return render(request, 'users/register_done.html')
+    else:
+        form = RegisterUserForm()
+    return render(request, 'users/register.html', {'form': form})
+```
+
+Пароли хранятся в зашифрованном виде (хэши), а `set_password()` кодирует их перед сохранением.
+
+### Завершение регистрации. Файл: `users/templates/users/register_done.html`
+
+```html
+{% extends 'base.html' %} {% block content %}
+<h1>Добро пожаловать!</h1>
+<p>
+  Вы успешно зарегистрировались! Для входа перейдите по
+  <a href="{% url 'users:login' %}">ссылке</a>.
+</p>
+{% endblock %}
+```
+
+### Схема файловой структуры
+
+```
+project/
+│── users/
+│   ├── templates/
+│   │   ├── users/
+│   │   │   ├── register.html
+│   │   │   ├── register_done.html
+│   ├── forms.py
+│   ├── views.py
+│   ├── urls.py
+│── templates/
+│   ├── base.html
+```
