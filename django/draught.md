@@ -7078,3 +7078,143 @@ project/
 │── templates/
 │   ├── base.html
 ```
+
+
+## 9.7 Класс UserCreationForm
+
+Переход от функции представления `register()` к классу представления, а также разберем использование стандартного класса `UserCreationForm` для создания нового пользователя.
+
+### Определение формы регистрации
+
+Перейдем в файл `users/forms.py` и создадим класс `RegisterUserForm` на основе `UserCreationForm`:
+
+```python
+from django import forms
+from django.contrib.auth.forms import UserCreationForm
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
+
+class RegisterUserForm(UserCreationForm):
+    username = forms.CharField(label='Логин', widget=forms.TextInput(attrs={'class': 'form-input'}))
+    password1 = forms.CharField(label='Пароль', widget=forms.PasswordInput(attrs={'class': 'form-input'}))
+    password2 = forms.CharField(label='Повтор пароля', widget=forms.PasswordInput(attrs={'class': 'form-input'}))
+
+    class Meta:
+        model = User
+        fields = ['username', 'email', 'first_name', 'last_name', 'password1', 'password2']
+        labels = {
+            'email': 'E-mail',
+            'first_name': 'Имя',
+            'last_name': 'Фамилия',
+        }
+        widgets = {
+            'email': forms.TextInput(attrs={'class': 'form-input'}),
+            'first_name': forms.TextInput(attrs={'class': 'form-input'}),
+            'last_name': forms.TextInput(attrs={'class': 'form-input'}),
+        }
+
+    def clean_email(self):
+        email = self.cleaned_data['email']
+        if User.objects.filter(email=email).exists():
+            raise forms.ValidationError("Такой E-mail уже существует!")
+        return email
+```
+
+- **Наследование от `UserCreationForm`**
+
+  - `UserCreationForm` – встроенная форма Django для регистрации нового пользователя.
+  - Мы расширяем ее, добавляя кастомные поля и валидацию.
+
+- **Настройка отображения полей формы**
+
+  - Используем `forms.CharField`, `forms.PasswordInput` для изменения внешнего вида.
+  - Атрибут `widget=forms.TextInput(attrs={'class': 'form-input'})` задает CSS-класс, который позволит стилизовать поля формы.
+
+- **Метод `clean_email`**
+  - Проверяет, существует ли уже указанный email в базе.
+  - Если email занят, выбрасывает `ValidationError`.
+
+### Улучшение шаблона формы
+
+Шаблон `register.html`:
+
+```html
+<form method="post">
+  {% csrf_token %}
+  <input type="hidden" name="next" value="{{ next }}" />
+  <div class="form-error">{{ form.non_field_errors }}</div>
+  {% for f in form %}
+  <p>
+    <label class="form-label" for="{{ f.id_for_label }}">{{ f.label }}:</label>
+    {{ f }}
+  </p>
+  <div class="form-error">{{ f.errors }}</div>
+  {% endfor %}
+  <p><button type="submit">Регистрация</button></p>
+</form>
+```
+
+### Создание представления регистрации
+
+Заменим функцию представления `register` на класс `RegisterUser`. Перейдем в `users/views.py` и добавим:
+
+```python
+from django.urls import reverse_lazy
+from django.views.generic.edit import CreateView
+from .forms import RegisterUserForm
+
+class RegisterUser(CreateView):
+    form_class = RegisterUserForm
+    template_name = 'users/register.html'
+    success_url = reverse_lazy('users:login')
+    extra_context = {'title': "Регистрация"}
+```
+
+- **Наследование от `CreateView`**
+
+  - `CreateView` – обобщенное представление Django для создания объектов модели.
+  - Само обрабатывает валидацию формы и сохранение в базу данных.
+
+- **`form_class = RegisterUserForm`**
+
+  - Указываем, что используем нашу кастомную форму `RegisterUserForm`.
+
+- **`template_name = 'users/register.html'`**
+
+  - Определяет, какой HTML-шаблон использовать для отображения формы.
+
+- **`success_url = reverse_lazy('users:login')`**
+
+  - После успешной регистрации пользователя перенаправляет на страницу входа.
+
+- **`extra_context = {'title': "Регистрация"}`**
+
+  - Передает в шаблон дополнительный контекст с заголовком страницы.
+
+-
+
+### Настройка маршрута
+
+Добавим маршрут в `users/urls.py`:
+
+```python
+from django.urls import path
+from .views import RegisterUser
+
+urlpatterns = [
+    path('register/', RegisterUser.as_view(), name='register'),
+]
+```
+
+### Структура файлов и импортов
+
+```
+users/
+│── forms.py  # Определение кастомной формы RegisterUserForm
+│── views.py  # Создание представления RegisterUser на основе CreateView
+│── urls.py   # Определение маршрута для регистрации
+│── templates/
+│   ├── users/
+│   │   ├── register.html  # Шаблон формы регистрации
+```
