@@ -7510,3 +7510,240 @@ path('password-change/done/', PasswordChangeDoneView.as_view(template_name="user
 - **Шаблоны (`templates/users/`)**:
   - `password_change_form.html` — форма смены пароля
   - `password_change_done.html` — подтверждение смены пароля
+
+## 9.10 Восстановление пароля. Идея алгоритма
+
+### Последовательность действий
+
+1. Пользователь нажимает на ссылку «Забыли пароль?», которая ведет на маршрут `password-reset/`.
+2. Открывается страница с формой для ввода email-адреса, привязанного к аккаунту.
+3. После отправки формы пользователь перенаправляется на страницу `password-reset/done/`, где отображается уведомление о том, что письмо отправлено.
+4. В почтовом ящике пользователь получает письмо со специальной ссылкой для восстановления пароля.
+5. При переходе по ссылке открывается страница `password-reset-confirm/uidb64/token/`, где пользователь вводит новый пароль.
+6. После успешного изменения пароля происходит редирект на страницу `password-reset-complete/`, сообщающую об успешном изменении пароля.
+
+Таким образом, если пользователь помнит email и имеет доступ к почтовому ящику, он может восстановить доступ к аккаунту.
+
+### Настройка консольного почтового бэкенда
+
+Для тестирования отправки писем в процессе разработки настроим Django так, чтобы письма отображались в консоли. Это удобно, так как не требует реального почтового сервера.
+
+В файле `settings.py` добавляем:
+
+```python
+EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+```
+
+По умолчанию Django использует `SMTP backend`, но мы пока оставим консольный бэкенд.
+
+### Проверка работы почтового бэкенда
+
+Запускаем Django shell:
+
+```sh
+python manage.py shell
+```
+
+Импортируем функцию `send_mail`:
+
+```python
+from django.core.mail import send_mail
+```
+
+Отправляем тестовое письмо:
+
+```python
+send_mail(
+    "Восстановление пароля",
+    "Перейдите по ссылке для восстановления пароля.",
+    "admin@mysite.com",
+    ["user@example.com"],
+)
+```
+
+В консоли отобразится следующее сообщение:
+
+```
+Content-Type: text/plain; charset="utf-8"
+MIME-Version: 1.0
+To: user@example.com
+Date: Sun, 10 Feb 2025 12:00:00 -0000
+Message-ID: <123456@mysite.com>
+
+Перейдите по ссылке для восстановления пароля.
+```
+
+## 9.11 Реализация алгоритма восстановления пароля в Django
+
+Для реализации будем использовать встроенные классы Django:
+
+- `PasswordResetView`
+- `PasswordResetDoneView`
+- `PasswordResetConfirmView`
+- `PasswordResetCompleteView`
+
+Также создадим соответствующие шаблоны и обновим маршруты в `urls.py`.
+
+### Создание шаблонов форм
+
+Создадим шаблон формы для запроса восстановления пароля `password_reset_form.html`:
+
+```html
+{% extends 'base.html' %} {% block content %}
+<h1>Восстановление пароля</h1>
+<form method="post">
+  {% csrf_token %} {% for f in form %}
+  <p>
+    <label class="form-label" for="{{ f.id_for_label }}">{{ f.label }}: </label>
+    {{ f }}
+  </p>
+  <div class="form-error">{{ f.errors }}</div>
+  {% endfor %}
+  <p><button type="submit">Сбросить по E-mail</button></p>
+</form>
+{% endblock %}
+```
+
+Создадим шаблон `password_reset_done.html`, который отображается после отправки email:
+
+```html
+{% extends "base.html" %} {% block content %}
+<h1>Сброс пароля</h1>
+<p>Инструкции по сбросу пароля отправлены на вашу почту.</p>
+<p>Если письмо не пришло, проверьте папку "Спам".</p>
+{% endblock %}
+```
+
+### Добавление маршрутов в `urls.py`
+
+В файле `users/urls.py` добавим маршруты:
+
+```python
+from django.urls import path
+from django.contrib.auth.views import (
+    PasswordResetView, PasswordResetDoneView,
+    PasswordResetConfirmView, PasswordResetCompleteView
+)
+
+urlpatterns = [
+    path('password-reset/',
+         PasswordResetView.as_view(template_name="users/password_reset_form.html"),
+         name='password_reset'),
+    path('password-reset/done/',
+         PasswordResetDoneView.as_view(template_name="users/password_reset_done.html"),
+         name='password_reset_done'),
+]
+```
+
+Добавим ссылку на восстановление пароля в `login.html`:
+
+```html
+<p><a href="{% url 'users:password_reset' %}">Забыли пароль?</a></p>
+```
+
+Запустим сервер и проверим форму. При отправке формы получим ошибку, что маршрут `password_reset_confirm` не определен. Добавим недостающие маршруты.
+
+### Создание шаблонов для сброса пароля
+
+Создадим `password_reset_confirm.html` для ввода нового пароля:
+
+```html
+{% extends 'base.html' %} {% block content %}
+<h1>Новый пароль</h1>
+<form method="post">
+  {% csrf_token %}
+  <div class="form-error">{{ form.non_field_errors }}</div>
+  {% for f in form %}
+  <p>
+    <label class="form-label" for="{{ f.id_for_label }}">{{ f.label }}: </label>
+    {{ f }}
+  </p>
+  <div class="form-error">{{ f.errors }}</div>
+  {% endfor %}
+  <p><button type="submit">Сохранить</button></p>
+</form>
+{% endblock %}
+```
+
+Создадим `password_reset_complete.html`:
+
+```html
+{% extends 'base.html' %} {% block content %}
+<h1>Пароль изменен</h1>
+<p>
+  Вы успешно сменили пароль. Теперь можете
+  <a href="{% url 'users:login' %}">войти</a>.
+</p>
+{% endblock %}
+```
+
+Обновим `users/urls.py`, добавив недостающие маршруты:
+
+```python
+path('password-reset/<uidb64>/<token>/',
+     PasswordResetConfirmView.as_view(template_name="users/password_reset_confirm.html"),
+     name='password_reset_confirm'),
+path('password-reset/complete/',
+     PasswordResetCompleteView.as_view(template_name="users/password_reset_complete.html"),
+     name='password_reset_complete'),
+```
+
+### Обновление email-шаблона
+
+Ошибка `NoReverseMatch` возникает из-за стандартного `password_reset_email.html`, который использует тег:
+
+```html
+{% url 'password_reset_confirm' uidb64=uid token=token %}
+```
+
+Обновим шаблон, добавив пространство имен:
+
+```html
+{{ protocol }}://{{ domain }}{% url 'users:password_reset_confirm' uidb64=uid
+token=token %}
+```
+
+Обновим маршрут `PasswordResetView`, добавив `email_template_name` и `success_url`:
+
+```python
+path('password-reset/',
+     PasswordResetView.as_view(
+         template_name="users/password_reset_form.html",
+         email_template_name="users/password_reset_email.html",
+         success_url=reverse_lazy("users:password_reset_done")
+     ),
+     name='password_reset'),
+```
+
+Обновим `PasswordResetConfirmView`, добавив `success_url`:
+
+```python
+path('password-reset/<uidb64>/<token>/',
+     PasswordResetConfirmView.as_view(
+         template_name="users/password_reset_confirm.html",
+         success_url=reverse_lazy("users:password_reset_complete")
+     ),
+     name='password_reset_confirm'),
+```
+
+После этого можно повторить процесс сброса пароля и убедиться, что все работает корректно.
+
+### Итоговая схема файлов
+
+1. **Шаблоны (`users/templates/users/`)**:
+
+   - `password_reset_form.html` – форма ввода email
+   - `password_reset_done.html` – сообщение об отправке email
+   - `password_reset_confirm.html` – форма ввода нового пароля
+   - `password_reset_complete.html` – сообщение об успешном изменении пароля
+   - `password_reset_email.html` – шаблон письма
+
+2. **Маршруты (`users/urls.py`)**:
+
+   - `password-reset/` → `PasswordResetView`
+   - `password-reset/done/` → `PasswordResetDoneView`
+   - `password-reset/<uidb64>/<token>/` → `PasswordResetConfirmView`
+   - `password-reset/complete/` → `PasswordResetCompleteView`
+
+3. **Обновления в `login.html`**:
+   - Добавлена ссылка на восстановление пароля.
