@@ -7815,3 +7815,157 @@ EMAIL_ADMIN = EMAIL_HOST_USER
 6. Попробуйте войти с новым паролем.
 
 Если все прошло успешно, значит, SMTP-бэкенд настроен правильно.
+
+## 9.13 Расширение модели User. Класс AbstractUser
+
+если нам дополнительно нужно хранить фотографию пользователя, его дату рождения, пол, город, семейное положение и так далее? Как это сделать? Как расширить уже существующую модель `User`?
+Во фреймворке Django для этой цели используют два разных подхода:
+
+1. Создание еще одной модели (например, `Profile`) со связью один к одному (`OneToOneField`) с моделью `User`.
+2. Создание новой модели `User` на базе специального класса `AbstractUser` фреймворка Django.
+
+### Сравнение подходов
+
+```
+| Подход | Преимущества | Недостатки |
+|--------|--------------|------------|
+| OneToOneField | Используется стандартная модель `User`, что сохраняет совместимость с Django | Необходимо делать дополнительные запросы для получения данных профиля |
+| AbstractUser | Все данные пользователя в одной модели, быстрее обработка | Нужно заранее учитывать изменения и заменять стандартную модель `User` |
+```
+
+На практике используют оба подхода, в зависимости от особенностей проекта. Однако, если нет жесткой необходимости использовать стандартную модель `User`, то предпочтение лучше отдать `AbstractUser`, так как он позволяет работать с одной моделью.
+
+### Использование `AbstractUser`
+
+#### 1. Определение модели пользователя
+
+Создадим кастомную модель пользователя, унаследованную от `AbstractUser`.
+
+**Файл `users/models.py`**:
+
+```python
+from django.contrib.auth.models import AbstractUser
+from django.db import models
+
+class User(AbstractUser):
+    photo = models.ImageField(upload_to="users/%Y/%m/%d/", blank=True, null=True, verbose_name="Фотография")
+    date_birth = models.DateField(blank=True, null=True, verbose_name="Дата рождения")
+```
+
+- **`ImageField`** – поле для загрузки изображения. Параметр `upload_to` задает путь хранения файлов.
+- **`DateField`** – поле для хранения даты рождения пользователя.
+
+#### 2. Регистрация модели в админ-панели
+
+**Файл `users/admin.py`**:
+
+```python
+from django.contrib import admin
+from django.contrib.auth.admin import UserAdmin
+from users.models import User
+
+admin.site.register(User, UserAdmin)
+```
+
+Здесь мы регистрируем нашу кастомную модель пользователя в админке.
+
+#### 3. Настройка `settings.py`
+
+Чтобы Django использовал нашу модель `User` вместо стандартной, необходимо добавить в `settings.py` следующую строку:
+
+```python
+AUTH_USER_MODEL = 'users.User'
+```
+
+Теперь при создании миграции **Django будет учитывать новую модель вместо стандартной.**
+
+#### 4. Создание миграций
+
+```sh
+python manage.py makemigrations
+python manage.py migrate
+```
+
+Если возникают ошибки, возможно, придется удалить предыдущие миграции и базу данных. Это необходимо, если проект уже использовал стандартную модель `User`, так как `AbstractUser` полностью заменяет её.
+
+```sh
+rm -rf users/migrations/
+rm db.sqlite3
+python manage.py makemigrations
+python manage.py migrate
+```
+
+#### 5. Замена стандартной модели `User` в коде
+
+Во всем проекте заменяем использование стандартной модели `User` на `get_user_model()`:
+
+```python
+from django.contrib.auth import get_user_model
+User = get_user_model()
+```
+
+Использование `get_user_model()` гарантирует, что Django всегда будет использовать текущую модель пользователя, указанную в `AUTH_USER_MODEL`.
+
+#### 6. Создание суперпользователя
+
+```sh
+python manage.py createsuperuser
+```
+
+Теперь можно войти в админ-панель с новым суперпользователем.
+
+### Расширение профиля пользователя в формах
+
+Добавим поле `date_birth` в форму редактирования профиля пользователя.
+
+**Файл `users/forms.py`**:
+
+```python
+from django import forms
+import datetime
+from django.contrib.auth import get_user_model
+
+class ProfileUserForm(forms.ModelForm):
+    this_year = datetime.date.today().year
+    date_birth = forms.DateField(
+        widget=forms.SelectDateWidget(years=tuple(range(this_year - 100, this_year - 5)))
+    )
+
+    class Meta:
+        model = get_user_model()
+        fields = ['photo', 'username', 'email', 'date_birth', 'first_name', 'last_name']
+```
+
+Здесь `SelectDateWidget` позволяет выбрать дату рождения из выпадающих списков.
+
+### Отображение фото пользователя
+
+Добавим отображение фотографии в шаблон профиля.
+
+**Файл `users/templates/users/profile.html`**:
+
+```html
+<form method="post" enctype="multipart/form-data">
+  {% csrf_token %} {% if user.photo %}
+  <p><img src="{{ user.photo.url }}" alt="Фото пользователя" /></p>
+  {% else %}
+  <p><img src="{{ default_image }}" alt="Фото по умолчанию" /></p>
+  {% endif %}
+</form>
+```
+
+Чтобы не прописывать путь вручную, добавим его в `settings.py`:
+
+```python
+DEFAULT_USER_IMAGE = MEDIA_URL + 'users/default.png'
+```
+
+И передадим `default_image` в шаблон через `views.py`:
+
+**Файл `users/views.py`**:
+
+```python
+from django.conf import settings
+
+extra_context = {'title': "Профиль пользователя", 'default_image': settings.DEFAULT_USER_IMAGE}
+```
