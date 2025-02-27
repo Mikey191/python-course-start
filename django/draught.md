@@ -7079,7 +7079,6 @@ project/
 │   ├── base.html
 ```
 
-
 ## 9.7 Класс UserCreationForm
 
 Переход от функции представления `register()` к классу представления, а также разберем использование стандартного класса `UserCreationForm` для создания нового пользователя.
@@ -7218,3 +7217,296 @@ users/
 │   ├── users/
 │   │   ├── register.html  # Шаблон формы регистрации
 ```
+
+## 9.8 Авторизация через email. Профайл пользователя
+
+### Базовый механизм аутентификации в Django
+
+По умолчанию Django использует `ModelBackend` для аутентификации пользователей по паре логин (username) и пароль (password).
+
+В файле `settings.py` можно явно указать используемый бэкенд аутентификации:
+
+```python
+AUTHENTICATION_BACKENDS = [
+    'django.contrib.auth.backends.ModelBackend',
+]
+```
+
+Класс `ModelBackend` наследуется от `BaseBackend`, который определяет два ключевых метода:
+
+- `authenticate(request, username=None, password=None, **kwargs)`: выполняет аутентификацию пользователя по `username` и `password`. Возвращает объект пользователя либо `None`, если пользователь не найден.
+- `get_user(user_id)`: получает объект пользователя по `user_id`.
+
+### Создание собственного бэкенда аутентификации по E-mail
+
+Мы создадим свой бэкенд, позволяющий входить в систему по адресу электронной почты. Для этого создадим файл `authentication.py` в приложении `users` и определим класс `EmailAuthBackend`:
+
+```python
+from django.contrib.auth.backends import BaseBackend
+from django.contrib.auth import get_user_model
+
+class EmailAuthBackend(BaseBackend):
+    def authenticate(self, request, email=None, password=None, **kwargs):
+        user_model = get_user_model()
+        try:
+            user = user_model.objects.get(email=email)
+            if user.check_password(password):
+                return user
+            return None
+        except (user_model.DoesNotExist, user_model.MultipleObjectsReturned):
+            return None
+```
+
+Теперь подключим наш бэкенд в `settings.py`:
+
+```python
+AUTHENTICATION_BACKENDS = [
+    'users.authentication.EmailAuthBackend',
+    'django.contrib.auth.backends.ModelBackend',
+]
+```
+
+### Добавление метода `get_user()`
+
+```python
+    def get_user(self, user_id):
+        user_model = get_user_model()
+        try:
+            return user_model.objects.get(pk=user_id)
+        except user_model.DoesNotExist:
+            return None
+```
+
+Теперь пользователи смогут входить в систему по E-mail.
+
+### Создание профиля пользователя. Определение шаблона профиля
+
+Создадим файл `users/templates/users/profile.html`:
+
+```html
+{% extends 'base.html' %} {% block content %}
+<h1>Профиль</h1>
+<form method="post">
+  {% csrf_token %}
+  <div class="form-error">{{ form.non_field_errors }}</div>
+  {% for f in form %}
+  <p><label for="{{ f.id_for_label }}">{{ f.label }}:</label> {{ f }}</p>
+  <div class="form-error">{{ f.errors }}</div>
+  {% endfor %}
+  <p><button type="submit">Сохранить</button></p>
+</form>
+{% endblock %}
+```
+
+### Определение формы `ProfileUserForm`
+
+```python
+from django import forms
+from django.contrib.auth import get_user_model
+
+class ProfileUserForm(forms.ModelForm):
+    email = forms.CharField(disabled=True, label='E-mail', widget=forms.TextInput(attrs={'class': 'form-input'}))
+
+    class Meta:
+        model = get_user_model()
+        fields = ['email', 'first_name', 'last_name']
+        labels = {
+            'first_name': 'Имя',
+            'last_name': 'Фамилия',
+        }
+        widgets = {
+            'first_name': forms.TextInput(attrs={'class': 'form-input'}),
+            'last_name': forms.TextInput(attrs={'class': 'form-input'}),
+        }
+```
+
+### Определение представления `ProfileUser`
+
+```python
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth import get_user_model
+from django.urls import reverse_lazy
+from django.views.generic import UpdateView
+from .forms import ProfileUserForm
+
+class ProfileUser(LoginRequiredMixin, UpdateView):
+    model = get_user_model()
+    form_class = ProfileUserForm
+    template_name = 'users/profile.html'
+    extra_context = {'title': "Профиль пользователя"}
+
+    def get_success_url(self):
+        return reverse_lazy('users:profile')
+
+    def get_object(self, queryset=None):
+        return self.request.user
+```
+
+### Определение маршрута `users/urls.py`
+
+```python
+from django.urls import path
+from .views import ProfileUser
+
+app_name = 'users'
+urlpatterns = [
+    path('profile/', ProfileUser.as_view(), name='profile'),
+]
+```
+
+### Добавление ссылки в меню `base.html`
+
+```html
+<li class="last">
+  <a href="{% url 'users:profile' %}">{{ user.email }}</a> |
+  <a href="{% url 'users:logout' %}">Выйти</a>
+</li>
+```
+
+### Схема файлов и импортов
+
+- **`authentication.py`** → `EmailAuthBackend`
+- **`settings.py`** → `AUTHENTICATION_BACKENDS`
+- **`forms.py`** → `ProfileUserForm`
+- **`views.py`** → `ProfileUser`
+- **`urls.py`** → `path('profile/', ProfileUser.as_view(), name='profile')`
+- **`profile.html`** → шаблон профиля
+
+## 9.9 Изменение пароля пользователя в Django: PasswordChangeView и PasswordChangeDoneView
+
+В данном уроке мы добавим этот функционал, используя классы представлений Django.
+
+### Классы Django для смены пароля
+
+Django предоставляет два встроенных класса для изменения пароля пользователя:
+
+- `PasswordChangeView` — обрабатывает форму смены пароля.
+- `PasswordChangeDoneView` — отображает страницу успешного изменения пароля.
+
+### Настройка маршрутов
+
+По умолчанию `PasswordChangeView` использует:
+
+- шаблон: `registration/password_change_form.html`
+- класс формы: `PasswordChangeForm`
+- редирект на маршрут с именем `password_change_done`
+
+Настроим маршруты в `users/urls.py`:
+
+```python
+from django.urls import path
+from django.contrib.auth.views import PasswordChangeView, PasswordChangeDoneView
+from . import views
+
+urlpatterns = [
+    path('login/', views.LoginUser.as_view(), name='login'),
+    path('logout/', views.LogoutView.as_view(), name='logout'),
+    path('password-change/', PasswordChangeView.as_view(), name='password_change'),
+    path('password-change/done/', PasswordChangeDoneView.as_view(), name='password_change_done'),
+    path('register/', views.RegisterUser.as_view(), name='register'),
+    path('profile/<int:pk>/', views.ProfileUser.as_view(), name='profile'),
+]
+```
+
+### Добавление ссылки в шаблон профиля
+
+В файле `users/templates/users/profile.html` добавим ссылку для смены пароля:
+
+```html
+<hr />
+<p><a href="{% url 'password_change' %}">Сменить пароль</a></p>
+```
+
+После этого, при переходе по ссылке, мы попадем в стандартную форму смены пароля Django, но нам нужна своя кастомная форма.
+
+### Создание шаблона формы смены пароля
+
+Создадим файл `users/templates/users/password_change_form.html` со следующим содержимым:
+
+```html
+{% extends 'base.html' %} {% block content %}
+<h1>Изменение пароля</h1>
+<form method="post">
+  {% csrf_token %}
+  <div class="form-error">{{ form.non_field_errors }}</div>
+  {% for f in form %}
+  <p>
+    <label class="form-label" for="{{ f.id_for_label }}">{{ f.label }}: </label
+    >{{ f }}
+  </p>
+  <div class="form-error">{{ f.errors }}</div>
+  {% endfor %}
+  <p><button type="submit">Изменить пароль</button></p>
+</form>
+{% endblock %}
+```
+
+### Создание кастомной формы смены пароля
+
+Определим свою форму на основе `PasswordChangeForm`, изменив отображение полей:
+
+```python
+from django.contrib.auth.forms import PasswordChangeForm
+from django import forms
+
+class UserPasswordChangeForm(PasswordChangeForm):
+    old_password = forms.CharField(label="Старый пароль", widget=forms.PasswordInput(attrs={'class': 'form-input'}))
+    new_password1 = forms.CharField(label="Новый пароль", widget=forms.PasswordInput(attrs={'class': 'form-input'}))
+    new_password2 = forms.CharField(label="Подтверждение пароля", widget=forms.PasswordInput(attrs={'class': 'form-input'}))
+```
+
+### Создание представления для смены пароля
+
+Теперь создадим собственное представление, использующее новую форму и перенаправляющее пользователя после успешного изменения пароля:
+
+```python
+from django.contrib.auth.views import PasswordChangeView
+from django.urls import reverse_lazy
+
+class UserPasswordChange(PasswordChangeView):
+    form_class = UserPasswordChangeForm
+    success_url = reverse_lazy("password_change_done")
+    template_name = "users/password_change_form.html"
+    extra_context = {'title': "Изменение пароля"}
+```
+
+Подключим его в маршруты:
+
+```python
+path('password-change/', views.UserPasswordChange.as_view(), name='password_change'),
+```
+
+### Создание шаблона успешного изменения пароля
+
+Создадим файл `users/templates/users/password_change_done.html`:
+
+```html
+{% extends 'base.html' %} {% block content %}
+<h1>Пароль успешно изменен!</h1>
+<p>
+  Вы успешно изменили пароль.
+  <a href="{% url 'profile' %}">Вернуться в профиль.</a>
+</p>
+{% endblock %}
+```
+
+### Настройка представления для успешной смены пароля
+
+Обновим маршрут `password_change_done`:
+
+```python
+path('password-change/done/', PasswordChangeDoneView.as_view(template_name="users/password_change_done.html"), name="password_change_done"),
+```
+
+### Итоговая схема взаимодействия файлов
+
+- **Маршруты (`urls.py`)**:
+  - `password-change/` → `UserPasswordChange`
+  - `password-change/done/` → `PasswordChangeDoneView`
+- **Представления (`views.py`)**:
+  - `UserPasswordChange` использует `UserPasswordChangeForm` и шаблон `password_change_form.html`
+- **Формы (`forms.py`)**:
+  - `UserPasswordChangeForm` основан на `PasswordChangeForm`
+- **Шаблоны (`templates/users/`)**:
+  - `password_change_form.html` — форма смены пароля
+  - `password_change_done.html` — подтверждение смены пароля
