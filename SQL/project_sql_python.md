@@ -1345,3 +1345,626 @@ conn.close()
       - Создай заказ,
       - Добавь новые товары,
       - Свяжи заказ с товарами. Убедись, что всё записано в базу и связи работают корректно.
+
+# 🧠 Урок 5: Создание CRUD-приложения через Python + SQLite (ручной способ)
+
+## 🔹 План урока
+
+- Что такое `CRUD`
+- База данных: `клиенты`, `заказы`, `товары`
+- Создание `консольного меню`
+- Реализация функций: `Create`, `Read`, `Update`, `Delete`
+- Ввод данных и взаимодействие с таблицами
+- Примеры кода
+- Практическое задание
+
+## 1. Что такое CRUD?
+
+**`CRUD` — это аббревиатура, описывающая базовые операции с данными в приложениях**:
+
+- `Create` — создание записей
+- `Read` — чтение (просмотр)
+- `Update` — обновление
+- `Delete` — удаление
+
+**Каждое приложение, работающее с базой данных, реализует эти четыре действия**.
+
+## 2. Функция для подключения к базе данных
+
+Для начала создадим отдельную функцию, которая будет подключаться к SQLite-базе данных и возвращать соединение и курсор.
+
+Это поможет повторно использовать её в других функциях.
+
+```python
+import sqlite3
+
+def get_connection():
+    conn = sqlite3.connect("shop.db")  # создаёт файл shop.db, если его нет
+    cursor = conn.cursor()
+    return conn, cursor
+```
+
+## 3. Структура базы: клиенты, заказы, товары
+
+Создадим 3 таблицы:
+
+### Таблица `clients`:
+
+- `id` INTEGER Уникальный идентификатор клиента (PRIMARY KEY, AUTOINCREMENT)
+- `name` TEXT Имя клиента (NOT NULL)
+
+### Таблица `products`
+
+- `id` INTEGER Уникальный ID товара (PRIMARY KEY, AUTOINCREMENT)
+- `title` TEXT Название товара (NOT NULL)
+
+### Таблица orders
+
+- `id` INTEGER Уникальный ID заказа (PRIMARY KEY, AUTOINCREMENT)
+- `client_id` INTEGER ID клиента, внешний ключ на clients(id)
+- `product_id` INTEGER ID товара, внешний ключ на products(id)
+- `quantity` INTEGER Количество заказанного товара (NOT NULL)
+
+#### **`orders` будет содержать связи между клиентами и продуктами.**
+
+## 4. Код для создания таблиц
+
+Теперь напишем функцию, которая создаёт все три таблицы.
+
+Важно, чтобы порядок создания учитывал наличие внешних ключей (поэтому clients и products создаются до orders).
+
+```python
+def create_tables():
+    conn, cursor = get_connection()
+
+    try:
+        # Включаем поддержку внешних ключей
+        cursor.execute("PRAGMA foreign_keys = ON")
+
+        # Таблица клиентов
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS clients (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL
+        )
+        """)
+
+        # Таблица товаров
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS products (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL
+        )
+        """)
+
+        # Таблица заказов
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS orders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            client_id INTEGER NOT NULL,
+            product_id INTEGER NOT NULL,
+            quantity INTEGER NOT NULL,
+            FOREIGN KEY (client_id) REFERENCES clients(id),
+            FOREIGN KEY (product_id) REFERENCES products(id)
+        )
+        """)
+
+        conn.commit()
+        print("Все таблицы успешно созданы.")
+
+    except Exception as e:
+        print("Ошибка при создании таблиц:", e)
+        conn.rollback()
+
+    finally:
+        conn.close()
+```
+
+Каждый пункт меню вызывает определённую функцию, работающую с базой.
+
+## 4. Использование функций
+
+Разделим всё по функциям, каждая из которых будет выполнять одну конкретную задачу:
+
+### 🔧 Общие замечания
+
+**Все функции используют**:
+
+- подключение к БД через `get_connection()`
+- автоматическое закрытие соединения (`finally`)
+- базовую обработку ошибок
+
+### 1. ✅ Добавить клиента
+
+```python
+def add_client(name):
+    conn, cursor = get_connection()
+    try:
+        cursor.execute("INSERT INTO clients (name) VALUES (?)", (name,))
+        conn.commit()
+        print(f"Клиент '{name}' успешно добавлен.")
+    except Exception as e:
+        print("Ошибка при добавлении клиента:", e)
+        conn.rollback()
+    finally:
+        conn.close()
+```
+
+### 2. ❌ Удалить клиента по ID
+
+```python
+def delete_client(client_id):
+    conn, cursor = get_connection()
+    try:
+        cursor.execute("DELETE FROM clients WHERE id = ?", (client_id,))
+        conn.commit()
+        print(f"Клиент с ID {client_id} удалён.")
+    except Exception as e:
+        print("Ошибка при удалении клиента:", e)
+        conn.rollback()
+    finally:
+        conn.close()
+```
+
+### 3. ✏️ Изменить имя клиента
+
+```python
+def update_client(client_id, new_name):
+    conn, cursor = get_connection()
+    try:
+        cursor.execute("UPDATE clients SET name = ? WHERE id = ?", (new_name, client_id))
+        conn.commit()
+        print(f"Имя клиента с ID {client_id} изменено на '{new_name}'.")
+    except Exception as e:
+        print("Ошибка при изменении клиента:", e)
+        conn.rollback()
+    finally:
+        conn.close()
+```
+
+### 4. 📄 Показать всех клиентов
+
+```python
+def show_all_clients():
+    conn, cursor = get_connection()
+    try:
+        cursor.execute("SELECT id, name FROM clients")
+        clients = cursor.fetchall()
+        print("Список клиентов:")
+        for client in clients:
+            print(f"ID: {client[0]}, Имя: {client[1]}")
+    except Exception as e:
+        print("Ошибка при выводе клиентов:", e)
+    finally:
+        conn.close()
+```
+
+### 5. ➕ Добавить заказ
+
+```python
+def add_order(client_id, product_id, quantity):
+    conn, cursor = get_connection()
+    try:
+        cursor.execute("""
+            INSERT INTO orders (client_id, product_id, quantity)
+            VALUES (?, ?, ?)
+        """, (client_id, product_id, quantity))
+        conn.commit()
+        print("Заказ успешно добавлен.")
+    except Exception as e:
+        print("Ошибка при добавлении заказа:", e)
+        conn.rollback()
+    finally:
+        conn.close()
+```
+
+### 6. 🗑 Удалить заказ по ID
+
+```python
+def delete_order(order_id):
+    conn, cursor = get_connection()
+    try:
+        cursor.execute("DELETE FROM orders WHERE id = ?", (order_id,))
+        conn.commit()
+        print(f"Заказ с ID {order_id} удалён.")
+    except Exception as e:
+        print("Ошибка при удалении заказа:", e)
+        conn.rollback()
+    finally:
+        conn.close()
+```
+
+### 7. 🔄 Изменить заказ (по ID)
+
+```python
+def update_order(order_id, client_id, product_id, quantity):
+    conn, cursor = get_connection()
+    try:
+        cursor.execute("""
+            UPDATE orders
+            SET client_id = ?, product_id = ?, quantity = ?
+            WHERE id = ?
+        """, (client_id, product_id, quantity, order_id))
+        conn.commit()
+        print(f"Заказ с ID {order_id} обновлён.")
+    except Exception as e:
+        print("Ошибка при обновлении заказа:", e)
+        conn.rollback()
+    finally:
+        conn.close()
+```
+
+### 8. 📋 Показать все заказы с JOIN
+
+```python
+def show_all_orders():
+    conn, cursor = get_connection()
+    try:
+        cursor.execute("""
+            SELECT
+                orders.id,
+                clients.name,
+                products.title,
+                orders.quantity
+            FROM orders
+            JOIN clients ON orders.client_id = clients.id
+            JOIN products ON orders.product_id = products.id
+        """)
+        orders = cursor.fetchall()
+        print("Список заказов:")
+        for order in orders:
+            print(f"ID заказа: {order[0]}, Клиент: {order[1]}, Товар: {order[2]}, Кол-во: {order[3]}")
+    except Exception as e:
+        print("Ошибка при выводе заказов:", e)
+    finally:
+        conn.close()
+```
+
+## 5. 📁 Структура файлов проекта **"Консольное CRUD-приложение"**
+
+```graphql
+crud_app/
+│
+├── database/
+│   ├── __init__.py
+│   ├── connection.py        # Подключение к БД
+│   └── schema.py            # Создание таблиц
+│
+├── crud/
+│   ├── __init__.py
+│   ├── clients.py           # CRUD-функции для клиентов
+│   └── orders.py            # CRUD-функции для заказов
+│
+├── main.py                  # Точка входа и меню
+```
+
+### 🔧 `database/connection.py`
+
+```python
+import sqlite3
+
+def get_connection():
+    conn = sqlite3.connect("app.db")
+    return conn, conn.cursor()
+```
+
+### 🔧 `database/schema.py`
+
+```python
+from .connection import get_connection
+
+def create_tables():
+    conn, cursor = get_connection()
+    try:
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS clients (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS products (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS orders (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                client_id INTEGER,
+                product_id INTEGER,
+                quantity INTEGER,
+                FOREIGN KEY (client_id) REFERENCES clients(id),
+                FOREIGN KEY (product_id) REFERENCES products(id)
+            )
+        """)
+        conn.commit()
+        print("Таблицы успешно созданы.")
+    except Exception as e:
+        print("Ошибка при создании таблиц:", e)
+    finally:
+        conn.close()
+```
+
+### 🔧 `crud/clients.py`
+
+```python
+from database.connection import get_connection
+
+def add_client(name):
+    conn, cursor = get_connection()
+    try:
+        cursor.execute("INSERT INTO clients (name) VALUES (?)", (name,))
+        conn.commit()
+        print("Клиент добавлен.")
+    except Exception as e:
+        print("Ошибка:", e)
+        conn.rollback()
+    finally:
+        conn.close()
+
+def delete_client(client_id):
+    conn, cursor = get_connection()
+    try:
+        cursor.execute("DELETE FROM clients WHERE id = ?", (client_id,))
+        conn.commit()
+        print("Клиент удалён.")
+    except Exception as e:
+        print("Ошибка:", e)
+        conn.rollback()
+    finally:
+        conn.close()
+
+def update_client(client_id, new_name):
+    conn, cursor = get_connection()
+    try:
+        cursor.execute("UPDATE clients SET name = ? WHERE id = ?", (new_name, client_id))
+        conn.commit()
+        print("Клиент обновлён.")
+    except Exception as e:
+        print("Ошибка:", e)
+        conn.rollback()
+    finally:
+        conn.close()
+
+def show_all_clients():
+    conn, cursor = get_connection()
+    try:
+        cursor.execute("SELECT * FROM clients")
+        for row in cursor.fetchall():
+            print(row)
+    except Exception as e:
+        print("Ошибка:", e)
+    finally:
+        conn.close()
+```
+
+### 🔧 `crud/orders.py`
+
+```python
+from database.connection import get_connection
+
+def add_order(client_id, product_id, quantity):
+    conn, cursor = get_connection()
+    try:
+        cursor.execute("INSERT INTO orders (client_id, product_id, quantity) VALUES (?, ?, ?)",
+                       (client_id, product_id, quantity))
+        conn.commit()
+        print("Заказ добавлен.")
+    except Exception as e:
+        print("Ошибка:", e)
+        conn.rollback()
+    finally:
+        conn.close()
+
+def delete_order(order_id):
+    conn, cursor = get_connection()
+    try:
+        cursor.execute("DELETE FROM orders WHERE id = ?", (order_id,))
+        conn.commit()
+        print("Заказ удалён.")
+    except Exception as e:
+        print("Ошибка:", e)
+        conn.rollback()
+    finally:
+        conn.close()
+
+def update_order(order_id, client_id, product_id, quantity):
+    conn, cursor = get_connection()
+    try:
+        cursor.execute("""
+            UPDATE orders
+            SET client_id = ?, product_id = ?, quantity = ?
+            WHERE id = ?
+        """, (client_id, product_id, quantity, order_id))
+        conn.commit()
+        print("Заказ обновлён.")
+    except Exception as e:
+        print("Ошибка:", e)
+        conn.rollback()
+    finally:
+        conn.close()
+
+def show_all_orders():
+    conn, cursor = get_connection()
+    try:
+        cursor.execute("""
+            SELECT orders.id, clients.name, products.title, orders.quantity
+            FROM orders
+            JOIN clients ON orders.client_id = clients.id
+            JOIN products ON orders.product_id = products.id
+        """)
+        for row in cursor.fetchall():
+            print(row)
+    except Exception as e:
+        print("Ошибка:", e)
+    finally:
+        conn.close()
+```
+
+### 🧠 `main.py`
+
+```python
+from database.schema import create_tables
+from crud.clients import add_client, delete_client, update_client, show_all_clients
+from crud.orders import add_order, delete_order, update_order, show_all_orders
+
+def menu():
+    print("\n=== Меню ===")
+    print("1. Добавить клиента")
+    print("2. Удалить клиента")
+    print("3. Изменить клиента")
+    print("4. Показать всех клиентов")
+    print("5. Добавить заказ")
+    print("6. Удалить заказ")
+    print("7. Изменить заказ")
+    print("8. Показать все заказы")
+    print("9. Выход")
+
+def main():
+    create_tables()
+
+    while True:
+        menu()
+        choice = input("Выберите пункт: ")
+
+        if choice == "1":
+            name = input("Имя клиента: ")
+            add_client(name)
+        elif choice == "2":
+            client_id = int(input("ID клиента: "))
+            delete_client(client_id)
+        elif choice == "3":
+            client_id = int(input("ID клиента: "))
+            new_name = input("Новое имя: ")
+            update_client(client_id, new_name)
+        elif choice == "4":
+            show_all_clients()
+        elif choice == "5":
+            client_id = int(input("ID клиента: "))
+            product_id = int(input("ID товара: "))
+            quantity = int(input("Количество: "))
+            add_order(client_id, product_id, quantity)
+        elif choice == "6":
+            order_id = int(input("ID заказа: "))
+            delete_order(order_id)
+        elif choice == "7":
+            order_id = int(input("ID заказа: "))
+            client_id = int(input("Новый ID клиента: "))
+            product_id = int(input("Новый ID товара: "))
+            quantity = int(input("Новое количество: "))
+            update_order(order_id, client_id, product_id, quantity)
+        elif choice == "8":
+            show_all_orders()
+        elif choice == "9":
+            print("Выход.")
+            break
+        else:
+            print("Неверный выбор!")
+
+if __name__ == "__main__":
+    main()
+```
+
+## 🛠 Практическая работа: **Реализация CRUD для таблицы products**
+
+### 🎯 Цель задания:
+
+Закрепить навыки работы с SQLite, модулями Python и CRUD-операциями. Вы научитесь создавать, читать, обновлять и удалять данные в таблице products, а также интегрировать эти функции в общее приложение с консольным интерфейсом.
+
+### 📋 Условия:
+
+В предыдущих заданиях у вас уже реализованы:
+
+- Функция подключения к базе данных
+- Создание таблиц clients, orders, products
+- CRUD-функции для clients и orders
+- Основной интерфейс в main.py
+
+#### Теперь вы должны реализовать такую же логику для таблицы products.
+
+### 📦 Структура проекта:
+
+Ваш проект уже содержит следующую структуру:
+
+```pgsql
+crud_app/
+├── database/
+│   ├── connection.py
+│   └── schema.py
+│
+├── crud/
+│   ├── clients.py
+│   ├── orders.py
+│   └── products.py   ← создать этот файл
+│
+├── main.py
+```
+
+### ✅ Что нужно сделать:
+
+1. Создайте модуль crud/products.py
+   В нем реализуйте следующие функции:
+
+### 🔹 1.1. add_product(title)
+
+Задача: добавить новый товар в таблицу products.
+
+Пояснение:
+
+Вставить название товара в базу
+
+Используйте параметризированный SQL-запрос
+
+### 🔹 1.2. delete_product(product_id)
+
+Задача: удалить товар по его ID
+
+Пояснение:
+
+Удалите строку из таблицы products по ID
+
+Добавьте проверку на наличие строки (по желанию)
+
+### 🔹 1.3. update_product(product_id, new_title)
+
+Задача: обновить название товара
+
+Пояснение:
+
+Используйте SQL UPDATE
+
+Передайте новый заголовок
+
+### 🔹 1.4. show_all_products()
+
+Задача: вывести список всех товаров
+
+Пояснение:
+
+Используйте SQL SELECT
+
+Выведите все строки таблицы products с ID и названием
+
+### Импортируйте эти функции в main.py
+
+Добавьте пункты в консольное меню:
+
+```markdown
+10. Добавить товар
+11. Удалить товар
+12. Изменить товар
+13. Показать все товары
+```
+
+Реализуйте обработку этих пунктов, вызывая соответствующие функции из crud/products.py.
+
+### 💡 Подсказки:
+
+Повторите структуру функций из clients.py и orders.py
+
+Используйте блоки try-except-finally для обработки ошибок
+
+Не забудьте закрыть соединение с БД после каждой операции
+
+В main.py добавьте импорты из crud.products
